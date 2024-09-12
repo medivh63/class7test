@@ -1,5 +1,9 @@
 use axum::{
-    extract::{Path, State}, http::header, response::{Html, IntoResponse}, routing::get, Error, Router
+    extract::{Path, State},
+    http::{header, HeaderMap},
+    response::{AppendHeaders, Html, IntoResponse},
+    routing::get,
+    Error, Router,
 };
 use captcha::{filters::Noise, Captcha};
 use lazy_static::lazy_static;
@@ -7,6 +11,8 @@ use log::{info, warn};
 use sqlx::{pool::PoolOptions, SqlitePool};
 use std::env::set_var;
 use tera::{Context, Tera};
+use tower_cookies::{CookieManagerLayer, Cookies};
+use uuid::Uuid;
 
 lazy_static! {
     pub static ref TEMPLATES: Tera = {
@@ -41,8 +47,9 @@ async fn main() {
     let app = Router::new()
         .route("/", get(index))
         .route("/exam/:exam_id", get(question))
-        .route("/captcha", get(generate_captcha)) // 新增的路由
+        //.route("/captcha", get(generate_captcha)) // 新增的路由
         .fallback(fallback)
+        .layer(CookieManagerLayer::new()) // 添加此行以启用 Cookie 管理
         .with_state(state);
 
     // run our app with hyper, listening globally on port 3000
@@ -113,15 +120,29 @@ other at the same time. After both cars have made a complete stop, which car sho
     }
 }
 
-async fn index() -> Html<String> {
+async fn index(cookies: Cookies) -> impl IntoResponse {
+    let exam_id = cookies.get("exam_id").map_or_else(
+        || {
+            // 如果没有cookie则生成新的exam_id
+            let id = Uuid::new_v4().to_string();
+            
+            info!("generate a new exam_id:{}", &id);
+            id
+        },
+        |cookie| cookie.value().to_string(),
+    );
+    let cookie = format!("exam_id={}; Path=/; HttpOnly", exam_id);
     let mut context = Context::new();
-    context.insert("start_exam_url", "/exam/1");
+    context.insert("start_exam_url", &format!("/exam/{}", exam_id));
     let html = TEMPLATES.render("index.html", &context);
     match html {
-        Ok(t) => Html(t),
+        Ok(t) => {
+            let headers = AppendHeaders([(header::SET_COOKIE, cookie)]);
+            (headers, Html(t))
+        }
         Err(e) => {
-            warn!("Error: {:?}", e);
-            Html(format!("Error: {}", e))
+            let headers = AppendHeaders([(header::SET_COOKIE, cookie)]);
+            (headers, Html(format!("错误: {}", e)))
         }
     }
 }
