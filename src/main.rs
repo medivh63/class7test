@@ -1,6 +1,6 @@
 use axum::{
     extract::{Path, State},
-    http::{header, HeaderMap},
+    http::header,
     response::{AppendHeaders, Html, IntoResponse},
     routing::get,
     Error, Router,
