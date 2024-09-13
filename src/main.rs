@@ -5,7 +5,6 @@ use axum::{
     routing::get,
     Error, Router,
 };
-use captcha::{filters::Noise, Captcha};
 use lazy_static::lazy_static;
 use log::{info, warn};
 use rand::seq::SliceRandom;
