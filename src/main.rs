@@ -8,6 +8,8 @@ use axum::{
 use captcha::{filters::Noise, Captcha};
 use lazy_static::lazy_static;
 use log::{info, warn};
+use rand::seq::SliceRandom;
+use serde::{Deserialize, Serialize};
 use sqlx::{pool::PoolOptions, SqlitePool};
 use std::env::set_var;
 use tera::{Context, Tera};
@@ -30,7 +32,8 @@ lazy_static! {
 
 #[derive(Clone)]
 struct AppState {
-    pub pool: SqlitePool,
+    pool: SqlitePool,
+    questions: Vec<String>,
 }
 #[tokio::main]
 async fn main() {
@@ -41,12 +44,18 @@ async fn main() {
 
     // 数据库连接池
     let db = init_db().await.unwrap();
-    let state = AppState { pool: db };
+
+    let questions = get_all_question_ids(&db).await;
+    info!("there have {} questions ", questions.len());
+    let state = AppState {
+        pool: db,
+        questions,
+    };
 
     // build our application with a route
     let app = Router::new()
         .route("/", get(index))
-        .route("/exam/:exam_id", get(question))
+        .route("/driving/exam/:exam_id", get(exam_question))
         //.route("/captcha", get(generate_captcha)) // 新增的路由
         .fallback(fallback)
         .layer(CookieManagerLayer::new()) // 添加此行以启用 Cookie 管理
@@ -59,12 +68,26 @@ async fn main() {
 }
 
 /// 定义Question结构体
+#[derive(sqlx::FromRow, Debug, Deserialize, Serialize)]
 struct Question {
+    id: Option<String>,
+    content: Option<String>,
+    images: Option<String>,
+    options: Option<String>,
+}
+
+#[derive(sqlx::FromRow, Debug, Deserialize, Serialize)]
+struct ExamRecord {
+    exam_id: Option<String>,
+    question_id: Option<String>,
+    is_correct: Option<i64>,
+}
+
+#[derive(Debug,Deserialize,Serialize)]
+struct QuestionOption {
     id: String,
     content: String,
-    question_images: Vec<String>,
-    options: Vec<String>,
-    correct_options: Vec<String>,
+    is_correct: bool,
 }
 
 // fallback handler
@@ -76,38 +99,34 @@ async fn fallback() -> Html<String> {
     }
 }
 
-async fn question(Path(exam_id): Path<String>, State(state): State<AppState>) -> Html<String> {
+async fn get_all_question_ids(pool: &SqlitePool) -> Vec<String> {
+    let questions: Vec<String> = sqlx::query!("SELECT id FROM question")
+        .fetch_all(pool)
+        .await
+        .unwrap()
+        .into_iter()
+        .map(|record| record.id.unwrap())
+        .collect();
+    questions
+}
+
+async fn exam_question(Path(exam_id): Path<String>, State(state): State<AppState>) -> Html<String> {
+    // 从state.questions随机取出一个id
+    let question_id = state.questions.choose(&mut rand::thread_rng()).unwrap();
     // 这里可以添加从数据库获取题目内容的逻辑
-
-    // 从数据库获取question实例
-    // let question = sqlx::query_as!(
-    //     Question,
-    //     "SELECT * FROM questions WHERE id = ?",
-    //     question_id
-    // )
-    // .fetch_one(&state.pool)
-    // .await
-    // .unwrap();
-    let question_content_en = "Two cars arrive at a four-way stop at right angles to each
-other at the same time. After both cars have made a complete stop, which car should go first?";
-    let question_content_zh ="
-在一个4个角落均有停车标志的十字路口，两辆车同时驶到跟对方成正角的位置，当双方都停下来的时候，谁先行？";
-    let question_images =
-        vec!["https://images.ctfassets.net/nnc41duedoho/3SXOiKUq7trvZ6O6i724C4/e0ce25b4c0e52ec67ec22819b2e5df13/Four-way-stop-vehicles-arrived-at-same-time.jpeg?w=640&q=100"];
-    let options = vec![
-        "30 km/h 时速30公里",
-        "40 km/h 时速40公里",
-        "50 km/h 时速50公里",
-        "60 km/h 时速60公里",
-    ];
-
-    // 例如: let question_content = get_question_from_db(&question_id).await;
-    // context.insert("question_content", &question_content);
+    // question_id 查询数据库获取题目内容
+    let question = sqlx::query_as::<_, Question>("SELECT * FROM question WHERE id = $1")
+        .bind(question_id)
+        .fetch_one(&state.pool)
+        .await
+        .unwrap();
+    let question_images = vec![question.images];
+    // question.options 转化为 options
+    let options: Vec<QuestionOption> = serde_json::from_str(&question.options.unwrap()).unwrap();
     let mut context = Context::new();
     context.insert("question_id", &exam_id);
     context.insert("question_images", &question_images);
-    context.insert("question_content_en", &question_content_en);
-    context.insert("question_content_zh", &question_content_zh);
+    context.insert("question_content", &question.content);
     context.insert("options", &options);
 
     let html = TEMPLATES.render("question.html", &context);
@@ -125,37 +144,20 @@ async fn index(cookies: Cookies) -> impl IntoResponse {
         || {
             // 如果没有cookie则生成新的exam_id
             let id = Uuid::new_v4().to_string();
-            
             info!("generate a new exam_id:{}", &id);
             id
         },
         |cookie| cookie.value().to_string(),
     );
-    let cookie = format!("exam_id={}; Path=/; HttpOnly", exam_id);
+    let cookie = format!("exam_id={}; Path=/; HttpOnly; Max-Age=10800", exam_id);
+    let headers = AppendHeaders([(header::SET_COOKIE, cookie)]);
     let mut context = Context::new();
     context.insert("start_exam_url", &format!("/exam/{}", exam_id));
     let html = TEMPLATES.render("index.html", &context);
     match html {
-        Ok(t) => {
-            let headers = AppendHeaders([(header::SET_COOKIE, cookie)]);
-            (headers, Html(t))
-        }
-        Err(e) => {
-            let headers = AppendHeaders([(header::SET_COOKIE, cookie)]);
-            (headers, Html(format!("错误: {}", e)))
-        }
+        Ok(t) => (headers, Html(t)),
+        Err(e) => (headers, Html(format!("错误: {}", e))),
     }
-}
-
-/// 生成图片验证码
-async fn generate_captcha() -> impl IntoResponse {
-    let png = Captcha::new()
-        .add_chars(4)
-        .apply_filter(Noise::new(0.3))
-        .view(220, 120)
-        .as_png()
-        .expect("生成验证码失败");
-    ([(header::CONTENT_TYPE, "image/png")], png)
 }
 
 /// 初始化数据库

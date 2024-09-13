@@ -3,92 +3,64 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Class 7 笔试题 - 题目 {{ question_id }}</title>
+    <title>阿省笔试模拟</title>
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <style>
-      .btn {
-            display: inline-block;
-            padding: 10px 16px;
-            font-size: 14px;
-            font-weight: 600;
-            line-height: 20px;
-            white-space: nowrap;
-            vertical-align: middle;
+        .options-container {
+            border: 1px solid #e2e8f0;
+            border-radius: 0.5rem;
+            overflow: hidden;
+        }
+        .option-box {
+            padding: 10px;
             cursor: pointer;
-            user-select: none;
-            border: 1px solid;
-            border-radius: 6px;
-            appearance: none;
-            color: #fff;
-            background-color: #2ea44f;
-            border-color: rgba(27, 31, 35, 0.15);
-            box-shadow: 0 1px 0 rgba(27, 31, 35, 0.1);
-            transition: background-color 0.2s cubic-bezier(0.3, 0, 0.5, 1);
-        }  
-        .btn:hover {
-            background-color: #2c974b;
+            transition: all 0.3s ease;
+            text-align: center;
+            border-bottom: 1px solid #e2e8f0;
         }
-
-        /* 响应式布局 */
-        @media (max-width: 768px) {
-            .container {
-                padding: 10px;
-            }
-
-            h1 {
-                font-size: 24px;
-            }
-
-            .content-box {
-                height: 300px;
-                padding: 15px;
-            }
-
-            h2 {
-                font-size: 20px;
-            }
+        .option-box:last-child {
+            border-bottom: none;
         }
-
-        @media (max-width: 480px) {
-            h1 {
-                font-size: 22px;
-            }
-
-            .content-box {
-                height: 250px;
-                padding: 10px;
-            }
-
-            h2 {
-                font-size: 18px;
-            }
-
-            .btn {
-                padding: 8px 12px;
-                font-size: 12px;
-            }
+        .option-box:hover {
+            background-color: #f7fafc;
         }
-
-        .btn-secondary {
-            background-color: #6c757d;
+        .option-box.correct {
+            background-color: #34d399;
+            color: #ffffff;
         }
-        .btn-secondary:hover {
-            background-color: #5a6268;
+        .option-box.incorrect {
+            background-color: #f87171;
+            color: #ffffff;
         }
-        
-        .correct-answer::before {
+        .option-box.correct::after {
             content: '✓';
-            color: green;
-            font-weight: bold;
-            margin-right: 5px;
+            color: #ffffff;
+            float: right;
         }
-        .incorrect-answer::before {
+        .option-box.incorrect::after {
             content: '✗';
-            color: red;
-            font-weight: bold;
-            margin-right: 5px;
+            color: #ffffff;
+            float: right;
         }
-        .disabled-option {
+        .option-box.disabled {
+            cursor: not-allowed;
+            opacity: 0.8;
+        }
+        .question-image {
+            max-width: 100%;
+            height: auto;
+            margin-bottom: 1rem;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .question-text {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #2d3748;
+            line-height: 1.5;
+            margin-bottom: 1rem;
+        }
+        .btn-disabled {
             opacity: 0.5;
             cursor: not-allowed;
         }
@@ -96,111 +68,64 @@
 </head>
 <body class="bg-gray-100 min-h-screen flex items-center justify-center py-12">
     <div class="bg-white p-8 rounded-lg shadow-md w-full max-w-2xl">
-        <h1 class="text-2xl font-bold mb-4 text-center text-gray-800">Class 7 笔试题</h1>
-        
-        <!-- 题目图片 -->
-        <div class="mb-6">
-            {% if question_images|length > 1 %}
-                <div class="grid grid-cols-2 gap-4">
-                    {% for image in question_images %}
-                        <img src="{{ image }}" alt="题目图片 {{ loop.index }}" class="w-full h-auto rounded-lg shadow-sm">
-                    {% endfor %}
-                </div>
-            {% else %}
-                <img src="{{ question_images[0] }}" alt="题目图片" class="w-full h-auto rounded-lg shadow-sm">
-            {% endif %}
-        </div>
+        <h1 class="text-2xl font-bold mb-4 text-center text-gray-800">阿省笔试模拟</h1>
         
         <div class="mb-6">
-            
-            <!-- 将英文和中文题目内容放在一个框体内 -->
             <div class="border border-gray-300 rounded-lg p-4 mb-4">
-                <p class="text-gray-600 mb-2">{{ question_content_en }}</p>
-                <p class="text-gray-600">{{ question_content_zh }}</p>
+                {% if question_images %}
+                    <div class="flex flex-wrap justify-center gap-4 mb-4">
+                        {% for image in question_images %}
+                            {% if image %}
+                                <img src="{{ image }}" alt="问题图片" class="question-image">
+                            {% endif %}
+                        {% endfor %}
+                    </div>
+                {% endif %}
+                <p class="question-text">{{ question_content }}</p>
             </div>
-            <div class="space-y-3">
-                {% for option in ["A", "B", "C", "D"] %}
-                <div class="flex items-center">
-                    <input type="radio" id="option{{ option }}" name="answer" value="{{ option }}" class="mr-3">
-                    <label for="option{{ option }}" class="text-gray-700" id="label{{ option }}">
-                        <span class="font-semibold mr-2">{{ option }}.</span>
-                        {{ options[loop.index0] }}
-                    </label>
-                </div>
+            
+            <div class="options-container">
+                {% for option in options %}
+                    <div class="option-box" data-option="{{ loop.index }}" data-correct="{{ option.is_correct }}" onclick="selectAnswer(this)">
+                        {{ option.content }}
+                    </div>
                 {% endfor %}
             </div>
         </div>
         
-        <div class="flex justify-between mt-6">
-            <button onclick="previousQuestion()" class="btn btn-secondary w-5/12">
-                上一题
-            </button>
-            <button id="submitButton" onclick="submitAnswer()" class="btn w-5/12">
-                提交答案
+        <div class="flex justify-center mt-6">
+            <button id="nextButton" onclick="nextQuestion()" class="bg-blue-500 hover:bg-blue-600 text-white font-semibold py-3 px-6 rounded-lg shadow-md transition duration-300 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 btn-disabled" disabled>
+                下一题
             </button>
         </div>
     </div>
 
     <script>
-        function submitAnswer() {
-            const selectedAnswer = document.querySelector('input[name="answer"]:checked');
-            
-            if (!selectedAnswer) {
-                alert('请选择一个答案');
-                return;
-            }
+        let answerSelected = false;
+        const nextButton = document.getElementById('nextButton');
 
-            // 假设确答案是 'A'
-            const correctAnswer = 'A';
+        function selectAnswer(selectedBox) {
+            if (answerSelected) return;
 
-            if (selectedAnswer.value === correctAnswer) {
-                const correctLabel = document.getElementById(`label${correctAnswer}`);
-                correctLabel.classList.add('correct-answer');
-                
-                const submitButton = document.getElementById('submitButton');
-                submitButton.textContent = '继续答题';
-                submitButton.onclick = nextQuestion;
-            } else {
-                const selectedLabel = document.getElementById(`label${selectedAnswer.value}`);
-                selectedLabel.classList.add('incorrect-answer');
-                
-                const correctLabel = document.getElementById(`label${correctAnswer}`);
-                correctLabel.classList.add('correct-answer');
-            }
-
-            // 禁用所有选项并置灰未选中的选项
-            document.querySelectorAll('input[name="answer"]').forEach(input => {
-                input.disabled = true;
-                const label = document.getElementById(`label${input.value}`);
-                if (input.value !== selectedAnswer.value && input.value !== correctAnswer) {
-                    label.classList.add('disabled-option');
+            answerSelected = true;
+            document.querySelectorAll('.option-box').forEach(box => {
+                box.classList.add('disabled');
+                box.classList.remove('correct', 'incorrect');
+                if (box.dataset.correct === 'true') {
+                    box.classList.add('correct');
+                } else if (box === selectedBox && selectedBox.dataset.correct !== 'true') {
+                    box.classList.add('incorrect');
                 }
             });
-        }
 
-        function previousQuestion() {
-            // 这里添加跳转到上一题的逻辑
-            alert('跳转到上一题');
+            // 启用"下一题"按钮
+            nextButton.classList.remove('btn-disabled');
+            nextButton.disabled = false;
         }
 
         function nextQuestion() {
-            // 这里添加跳转到下一题的逻辑
-            alert('跳转到下一题');
-            // 重置按钮状态和选项
-            const submitButton = document.getElementById('submitButton');
-            submitButton.textContent = '提交答案';
-            submitButton.onclick = submitAnswer;
-
-            // 移除正确和错误答案的标记,以及置灰效果
-            document.querySelectorAll('.correct-answer, .incorrect-answer, .disabled-option').forEach(el => {
-                el.classList.remove('correct-answer', 'incorrect-answer', 'disabled-option');
-            });
-
-            // 重新启用所有选项
-            document.querySelectorAll('input[name="answer"]').forEach(input => {
-                input.disabled = false;
-                input.checked = false;
-            });
+            // 刷新当前页面
+            window.location.reload();
         }
     </script>
 </body>

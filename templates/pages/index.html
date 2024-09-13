@@ -144,55 +144,8 @@
                     style="color: red;">有持全驾照司机的陪同下进行实际驾驶练习</strong>。</p>
         </div>
 
-        <div class="captcha-container">
-            <button onclick="getCaptcha()" class="btn">开始模拟</button>
-            <div id="captchaImageContainer"></div>
-            <input type="text" id="captchaInput" placeholder="请输入验证码" style="display: none;">
-            <button onclick="verifyCaptcha()" class="btn" id="verifyButton" style="display: none;">验证</button>
-        </div>
-    </div>
-    <script>
-        async function getCaptcha() {
-            try {
-                const response = await fetch('/captcha');
-                const blob = await response.blob();
-                const imageUrl = URL.createObjectURL(blob);
-    
-                const container = document.getElementById('captchaImageContainer');
-                container.innerHTML = `<img src="${imageUrl}" alt="验证码" class="captcha-image">`;
-                
-                // 显示输入框和验证按钮
-                document.getElementById('captchaInput').style.display = 'inline-block';
-                document.getElementById('verifyButton').style.display = 'inline-block';
-            } catch (error) {
-                console.error('获取验证码失败:', error);
-                alert('获取验证码失败,请重试');
-            }
-        }
-    
-        async function verifyCaptcha() {
-            const captchaInput = document.getElementById('captchaInput').value;
-            try {
-                const response = await fetch('/verify-captcha', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ captcha: captchaInput }),
-                });
-                const result = await response.json();
-                if (result.success) {
-                    alert('验证成功，开始模拟考试！');
-                    // 这里可以添加开始模拟考试的逻辑
-                } else {
-                    alert('验证码错误，请重试！');
-                }
-            } catch (error) {
-                console.error('验证失败:', error);
-                alert('验证失败，请重试');
-            }
-        }
-    </script>
+        <a href="{{ start_exam_url }}" class="btn">开始模拟</a>
+
 </body>
 
 </html>

@@ -20,3 +20,4 @@ tera = { version = "1"}
 lazy_static = {version = "1"}
 captcha = "0.0.9"
 tower-cookies = "0.10"
+rand = "0.8.5"
