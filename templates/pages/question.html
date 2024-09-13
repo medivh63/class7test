@@ -7,33 +7,13 @@
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        .container {
-            width: 100%;
-            max-width: 640px;
-            margin: 0 auto;
-            padding: 1rem;
-        }
-        .question-wrapper {
-            height: 500px; /* 设置固定高度，与 index.html 保持一致 */
-            display: flex;
-            flex-direction: column;
-        }
-        .question-content {
-            padding: 1rem 1rem 0.5rem;
-            flex-shrink: 0; /* 防止内容被压缩 */
-        }
         .question-container {
             border: 1px solid #e2e8f0;
             border-radius: 0.5rem;
-            overflow-y: auto; /* 添加垂直滚动条 */
-            flex-grow: 1; /* 允许问题容器占据剩余空间 */
-            display: flex;
-            flex-direction: column;
+            overflow: hidden;
         }
-        .options-container {
-            flex-grow: 1;
-            display: flex;
-            flex-direction: column;
+        .question-content {
+            padding: 1rem 1rem 0.5rem;
         }
         .option-box {
             padding: 1rem;
@@ -45,18 +25,17 @@
             justify-content: center;
             text-align: center;
             position: relative;
-            min-height: 60px; /* 添加最小高度 */
-            flex-shrink: 0; /* 防止选项被压缩 */
+            min-height: 60px;
         }
         .option-box:first-child {
-            border-top: none;
+            border-top: none; /* 移除第一个选项的上边框 */
         }
         .option-box::before {
             font-family: 'Font Awesome 6 Free';
             position: absolute;
             left: 1rem;
             font-weight: 900;
-            font-size: 24px;
+            font-size: 24px; /* 将图标大小从 36px 减小到 24px */
             top: 50%;
             transform: translateY(-50%);
             opacity: 0;
@@ -74,9 +53,8 @@
         }
         .option-content {
             flex: 1;
-            padding: 0 3rem;
+            padding: 0 4rem;
             text-align: center;
-            word-break: break-word;
         }
         .option-box:hover {
             background-color: #f7fafc;
@@ -93,59 +71,73 @@
             cursor: not-allowed;
             opacity: 0.8;
         }
+        .question-image {
+            max-width: 40%; /* 将最大宽度从 80% 减小到 40% */
+            height: auto;
+            margin-bottom: 1rem;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            display: block;
+            margin-left: auto;
+            margin-right: auto;
+        }
         .question-text {
             font-size: 1.1rem;
             font-weight: 600;
             color: #2d3748;
             line-height: 1.5;
             margin-bottom: 1rem;
-            text-align: left;
-            display: flex;
-            align-items: flex-start;
+            text-align: center;
         }
-        .question-number {
-            color: #4a5568;
-            margin-right: 0.5rem;
-            flex-shrink: 0;
-        }
-        .button-container {
-            height: 60px; /* 为按钮预留固定高度 */
-            display: flex;
-            align-items: center;
-            justify-content: center;
+        .btn-disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            pointer-events: none; /* 禁用鼠标事件 */
         }
         .next-button {
-            display: none;
+            display: block; /* 改为 block，使按钮始终显示 */
+        }
+        .question-box {
+            border: 1px solid #e2e8f0;
+            border-radius: 0.5rem;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            background-color: #f8fafc;
         }
     </style>
 </head>
 <body class="bg-gray-100 min-h-screen flex items-center justify-center py-12">
-    <div class="container">
-        <div class="bg-white p-6 rounded-lg shadow-md relative question-wrapper">
-            <div class="absolute top-2 right-2 text-gray-600 font-semibold">
-                {{ current_question_number }}/{{ total_questions }}
-            </div>
+    <div class="bg-white p-8 rounded-lg shadow-md w-full max-w-2xl relative">
+        <!-- 添加统计显示到右上角 -->
+        <div class="absolute top-2 right-2 text-gray-600 font-semibold">
+            {{ current_question_number }}/{{ total_questions }}
+        </div>
 
-            <div class="question-content mb-4">
-                <p class="question-text">
-                    <span class="question-number">{{ current_question_number }}. </span>
-                    {{ question_content }}
-                </p>
-            </div>
-            
-            <div class="question-container mb-4">
-                {% for option in options %}
-                    <div class="option-box" data-option="{{ loop.index }}" data-correct="{{ option.is_correct }}" onclick="selectAnswer(this)">
-                        <span class="option-content">{{ option.content }}</span>
-                    </div>
-                {% endfor %}
-            </div>
-            
-            <div class="button-container">
-                <button id="nextButton" onclick="nextQuestion()" class="bg-blue-500 hover:bg-blue-600 text-white font-semibold py-3 px-6 rounded-lg shadow-md transition duration-300 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 next-button">
-                    下一题
-                </button>
-            </div>
+        <div class="question-box">
+            <p class="question-text">{{ question_content }}</p>
+            {% if question_images %}
+                <div class="flex flex-wrap justify-center gap-4 mt-4">
+                    {% for image in question_images %}
+                        {% if image %}
+                            <img src="{{ image }}" alt="问题图片" class="question-image">
+                        {% endif %}
+                    {% endfor %}
+                </div>
+            {% endif %}
+        </div>
+        
+        <div class="question-container mb-6">
+            {% for option in options %}
+                <div class="option-box" data-option="{{ loop.index }}" data-correct="{{ option.is_correct }}" onclick="selectAnswer(this)">
+                    <span class="option-content">{{ option.content }}</span>
+                </div>
+            {% endfor %}
+        </div>
+        
+        <div class="flex justify-center mt-6">
+            <button id="nextButton" onclick="nextQuestion()" class="bg-blue-500 hover:bg-blue-600 text-white font-semibold py-3 px-6 rounded-lg shadow-md transition duration-300 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 next-button btn-disabled">
+                下一题
+            </button>
         </div>
     </div>
 
@@ -193,10 +185,11 @@
                 }
             });
 
+            // 启用下一题按钮
+            nextButton.classList.remove('btn-disabled');
+
             if (isCorrect) {
                setTimeout(nextQuestion, 2000);
-            } else {
-                nextButton.style.display = 'block';
             }
         }
 
