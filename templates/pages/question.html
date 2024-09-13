@@ -5,21 +5,78 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>阿省笔试模拟</title>
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        .options-container {
+        .container {
+            width: 100%;
+            max-width: 640px;
+            margin: 0 auto;
+            padding: 1rem;
+        }
+        .question-wrapper {
+            height: 500px; /* 设置固定高度，与 index.html 保持一致 */
+            display: flex;
+            flex-direction: column;
+        }
+        .question-content {
+            padding: 1rem 1rem 0.5rem;
+            flex-shrink: 0; /* 防止内容被压缩 */
+        }
+        .question-container {
             border: 1px solid #e2e8f0;
             border-radius: 0.5rem;
-            overflow: hidden;
+            overflow-y: auto; /* 添加垂直滚动条 */
+            flex-grow: 1; /* 允许问题容器占据剩余空间 */
+            display: flex;
+            flex-direction: column;
+        }
+        .options-container {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
         }
         .option-box {
-            padding: 10px;
+            padding: 1rem;
             cursor: pointer;
             transition: all 0.3s ease;
+            border-top: 1px solid #e2e8f0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             text-align: center;
-            border-bottom: 1px solid #e2e8f0;
+            position: relative;
+            min-height: 60px; /* 添加最小高度 */
+            flex-shrink: 0; /* 防止选项被压缩 */
         }
-        .option-box:last-child {
-            border-bottom: none;
+        .option-box:first-child {
+            border-top: none;
+        }
+        .option-box::before {
+            font-family: 'Font Awesome 6 Free';
+            position: absolute;
+            left: 1rem;
+            font-weight: 900;
+            font-size: 24px;
+            top: 50%;
+            transform: translateY(-50%);
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        .option-box.correct::before {
+            content: '\f00c';
+            color: #ffffff;
+            opacity: 1;
+        }
+        .option-box.incorrect::before {
+            content: '\f00d';
+            color: #ffffff;
+            opacity: 1;
+        }
+        .option-content {
+            flex: 1;
+            padding: 0 3rem;
+            text-align: center;
+            word-break: break-word;
         }
         .option-box:hover {
             background-color: #f7fafc;
@@ -32,26 +89,9 @@
             background-color: #f87171;
             color: #ffffff;
         }
-        .option-box.correct::after {
-            content: '✓';
-            color: #ffffff;
-            float: right;
-        }
-        .option-box.incorrect::after {
-            content: '✗';
-            color: #ffffff;
-            float: right;
-        }
         .option-box.disabled {
             cursor: not-allowed;
             opacity: 0.8;
-        }
-        .question-image {
-            max-width: 100%;
-            height: auto;
-            margin-bottom: 1rem;
-            border-radius: 8px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
         }
         .question-text {
             font-size: 1.1rem;
@@ -59,10 +99,20 @@
             color: #2d3748;
             line-height: 1.5;
             margin-bottom: 1rem;
+            text-align: left;
+            display: flex;
+            align-items: flex-start;
         }
-        .btn-disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
+        .question-number {
+            color: #4a5568;
+            margin-right: 0.5rem;
+            flex-shrink: 0;
+        }
+        .button-container {
+            height: 60px; /* 为按钮预留固定高度 */
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
         .next-button {
             display: none;
@@ -70,36 +120,32 @@
     </style>
 </head>
 <body class="bg-gray-100 min-h-screen flex items-center justify-center py-12">
-    <div class="bg-white p-8 rounded-lg shadow-md w-full max-w-2xl">
-        <h1 class="text-2xl font-bold mb-4 text-center text-gray-800">阿省笔试模拟</h1>
-        
-        <div class="mb-6">
-            <div class="border border-gray-300 rounded-lg p-4 mb-4">
-                {% if question_images %}
-                    <div class="flex flex-wrap justify-center gap-4 mb-4">
-                        {% for image in question_images %}
-                            {% if image %}
-                                <img src="{{ image }}" alt="问题图片" class="question-image">
-                            {% endif %}
-                        {% endfor %}
-                    </div>
-                {% endif %}
-                <p class="question-text">{{ question_content }}</p>
+    <div class="container">
+        <div class="bg-white p-6 rounded-lg shadow-md relative question-wrapper">
+            <div class="absolute top-2 right-2 text-gray-600 font-semibold">
+                {{ current_question_number }}/{{ total_questions }}
+            </div>
+
+            <div class="question-content mb-4">
+                <p class="question-text">
+                    <span class="question-number">{{ current_question_number }}. </span>
+                    {{ question_content }}
+                </p>
             </div>
             
-            <div class="options-container">
+            <div class="question-container mb-4">
                 {% for option in options %}
                     <div class="option-box" data-option="{{ loop.index }}" data-correct="{{ option.is_correct }}" onclick="selectAnswer(this)">
-                        {{ option.content }}
+                        <span class="option-content">{{ option.content }}</span>
                     </div>
                 {% endfor %}
             </div>
-        </div>
-        
-        <div class="flex justify-center mt-6">
-            <button id="nextButton" onclick="nextQuestion()" class="bg-blue-500 hover:bg-blue-600 text-white font-semibold py-3 px-6 rounded-lg shadow-md transition duration-300 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 next-button">
-                下一题
-            </button>
+            
+            <div class="button-container">
+                <button id="nextButton" onclick="nextQuestion()" class="bg-blue-500 hover:bg-blue-600 text-white font-semibold py-3 px-6 rounded-lg shadow-md transition duration-300 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 next-button">
+                    下一题
+                </button>
+            </div>
         </div>
     </div>
 
@@ -130,17 +176,16 @@
                 });
 
                 if (!response.ok) {
-                    throw new Error('保存答题记录失败');
+                    throw new Error('Failed to save answer record');
                 }
             } catch (error) {
-                console.error('保存答题记录时出错:', error);
+                console.error('Error while saving answer record:', error);
                 // 这里可以添加一些错误处理逻辑，比如显示一个错误消息给用户
             }
 
             // 显示正确答案和用户选择
             document.querySelectorAll('.option-box').forEach(box => {
                 box.classList.add('disabled');
-                box.classList.remove('correct', 'incorrect');
                 if (box.dataset.correct === 'true') {
                     box.classList.add('correct');
                 } else if (box === selectedBox && !isCorrect) {

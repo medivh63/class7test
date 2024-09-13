@@ -1,7 +1,7 @@
 use axum::{
     extract::{Path, State},
     http::header,
-    response::{AppendHeaders, Html, IntoResponse},
+    response::{AppendHeaders, Html, IntoResponse, Redirect},
     routing::{get, post},
     Error, Json, Router,
 };
@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use sqlx::{pool::PoolOptions, SqlitePool};
 use std::env::set_var;
 use tera::{Context, Tera};
-use tower_cookies::{CookieManagerLayer, Cookies};
+use tower_cookies::{Cookie, CookieManagerLayer, Cookies};
 use uuid::Uuid;
 
 lazy_static! {
@@ -54,6 +54,7 @@ async fn main() {
     // build our application with a route
     let app = Router::new()
         .route("/", get(index))
+        .route("/restart", get(restart))
         .route("/driving/exam/:exam_id", get(exam_question))
         .route("/driving/exam/answer", post(exam_answer))
         .fallback(fallback)
@@ -80,11 +81,11 @@ struct ExamRecord {
     exam_id: Option<String>,
     question_id: Option<String>,
     is_correct: Option<i64>,
+    created_at: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
 struct QuestionOption {
-    id: String,
     content: String,
     is_correct: bool,
 }
@@ -94,6 +95,13 @@ struct Answer {
     exam_id: String,
     question_id: String,
     is_correct: bool,
+}
+
+async fn restart(cookies: Cookies) -> Redirect {
+    // 清除 exam_id cookie
+    cookies.remove(Cookie::new("exam_id", ""));
+    // 重定向到首页
+    Redirect::to("/")
 }
 
 // fallback handler
@@ -124,25 +132,59 @@ async fn exam_answer(
     let record = ExamRecord {
         exam_id: Some(answer.exam_id),
         question_id: Some(answer.question_id),
+        // 获取当前时间格式“2024-05-01 12:00:00”
+        created_at: Some(chrono::Utc::now().to_string()),
         is_correct: Some(answer.is_correct as i64),
     };
     sqlx::query!(
-        "INSERT INTO exam_record (exam_id, question_id, is_correct) VALUES ($1, $2, $3)",
+        "INSERT INTO exam_record (exam_id, question_id, is_correct, created_at) VALUES ($1, $2, $3, $4)",
         record.exam_id,
         record.question_id,
-        record.is_correct
+        record.is_correct,
+        record.created_at
     )
     .execute(&state.pool)
     .await
     .unwrap();
 
-    "答题记录已保存".into_response()
+    "answer saved".into_response()
 }
 
 async fn exam_question(Path(exam_id): Path<String>, State(state): State<AppState>) -> Html<String> {
-    // 从state.questions随机取出一个id
-    let question_id = state.questions.choose(&mut rand::thread_rng()).unwrap();
-    // 这里可以添加从数据库获取题目内容的逻辑
+    info!("exam_id:{}", exam_id);
+    // 查询 exam_record , 这个sql返回的是一个集合
+    let exam_question_ids: Vec<String> =
+        sqlx::query_scalar("SELECT DISTINCT question_id FROM exam_record WHERE exam_id = ?")
+            .bind(&exam_id)
+            .fetch_all(&state.pool)
+            .await
+            .unwrap();
+    // 从state.questions和exam_question_ids取差集
+    let question_ids = state
+        .questions
+        .clone()
+        .into_iter()
+        .filter(|id| !exam_question_ids.contains(id))
+        .collect::<Vec<String>>();
+    // 如果question_ids为空，表示用户已答完所有题目
+    if question_ids.is_empty() {
+        // 跳转到completed页面
+        let mut context = Context::new();
+        context.insert("exam_id", &exam_id);
+        context.insert("total_questions", &state.questions.len());
+        context.insert("correct_answers", &exam_question_ids.len());
+        context.insert("accuracy", &format!("{:.2}%", (exam_question_ids.len() as f64 / state.questions.len() as f64) * 100.0));
+        let html = TEMPLATES.render("completed.html", &context);
+        match html {
+            Ok(t) => return Html(t),
+            Err(e) => {
+                warn!("Error: {:?}", e);
+                return Html(format!("错误: {}", e));
+            }
+        }
+    }
+    // 从question_ids随机取一个
+    let question_id = question_ids.choose(&mut rand::thread_rng()).unwrap();
     // question_id 查询数据库获取题目内容
     let question = sqlx::query_as::<_, Question>("SELECT * FROM question WHERE id = $1")
         .bind(question_id)
@@ -150,21 +192,21 @@ async fn exam_question(Path(exam_id): Path<String>, State(state): State<AppState
         .await
         .unwrap();
     let question_images = vec![question.images];
-    // question.options 转化为 options
     let options: Vec<QuestionOption> = serde_json::from_str(&question.options.unwrap()).unwrap();
     let mut context = Context::new();
     context.insert("exam_id", &exam_id);
     context.insert("question_id", &question_id);
     context.insert("question_images", &question_images);
     context.insert("question_content", &question.content);
+    context.insert("current_question_number", &question_ids.len());
+    context.insert("total_questions", &state.questions.len());
     context.insert("options", &options);
-
     let html = TEMPLATES.render("question.html", &context);
     match html {
         Ok(t) => Html(t),
         Err(e) => {
             warn!("Error: {:?}", e);
-            Html(format!("错误: {}", e))
+            return Html(format!("错误: {}", e));
         }
     }
 }

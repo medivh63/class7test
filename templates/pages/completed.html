@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>考试完成</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f4f4f4;
+        }
+        .container {
+            background-color: #fff;
+            border-radius: 8px;
+            padding: 30px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .result-container {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .result-item {
+            background-color: #f8f9fa;
+            padding: 10px;
+            border-radius: 5px;
+            text-align: center;
+        }
+        .result-item strong {
+            display: block;
+            margin-bottom: 5px;
+        }
+        .result-item .value {
+            font-weight: bold;
+        }
+        .result-item .green {
+            color: #27ae60;
+        }
+        .accuracy {
+            font-size: 24px;
+            font-weight: bold;
+            color: #27ae60;
+            text-align: center;
+            margin: 20px 0;
+        }
+        .btn {
+            display: inline-block;
+            background-color: #3498db;
+            color: #fff;
+            padding: 10px 20px;
+            text-decoration: none;
+            border-radius: 5px;
+            transition: background-color 0.3s;
+        }
+        .btn:hover {
+            background-color: #2980b9;
+        }
+    </style>
+    <script>
+        function clearExamIdAndRestart() {
+            fetch('/restart', { method: 'GET' })
+                .then(() => {
+                    window.location.href = '/';
+                })
+                .catch(error => {
+                    console.error('重新开始时出错:', error);
+                    alert('重新开始失败，请刷新页面重试。');
+                });
+            window.location.href = '/';
+        }
+    </script>
+</head>
+<body>
+    <div class="container">
+        <h1>恭喜你完成了所有题目！</h1>
+        <div class="result-container">
+            <div class="result-item">
+                <strong>考试 ID</strong>
+                <span class="value">{{ exam_id }}</span>
+            </div>
+            <div class="result-item">
+                <strong>总题数</strong>
+                <span class="value">{{ total_questions }}</span>
+            </div>
+            <div class="result-item">
+                <strong>正确题数</strong>
+                <span class="value green">{{ correct_answers }}</span>
+            </div>
+            <div class="result-item">
+                <strong>正确率</strong>
+                <span class="value green">{{ accuracy }}%</span>
+            </div>
+        </div>
+        <div style="text-align: center;">
+            <a href="#" class="btn" onclick="clearExamIdAndRestart()">重新开始</a>
+        </div>
+    </div>
+</body>
+</html>
