@@ -64,6 +64,9 @@
             opacity: 0.5;
             cursor: not-allowed;
         }
+        .next-button {
+            display: none;
+        }
     </style>
 </head>
 <body class="bg-gray-100 min-h-screen flex items-center justify-center py-12">
@@ -94,7 +97,7 @@
         </div>
         
         <div class="flex justify-center mt-6">
-            <button id="nextButton" onclick="nextQuestion()" class="bg-blue-500 hover:bg-blue-600 text-white font-semibold py-3 px-6 rounded-lg shadow-md transition duration-300 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 btn-disabled" disabled>
+            <button id="nextButton" onclick="nextQuestion()" class="bg-blue-500 hover:bg-blue-600 text-white font-semibold py-3 px-6 rounded-lg shadow-md transition duration-300 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 next-button">
                 下一题
             </button>
         </div>
@@ -104,23 +107,52 @@
         let answerSelected = false;
         const nextButton = document.getElementById('nextButton');
 
-        function selectAnswer(selectedBox) {
+        async function selectAnswer(selectedBox) {
             if (answerSelected) return;
 
             answerSelected = true;
+            const isCorrect = selectedBox.dataset.correct === 'true';
+            const selectedOption = selectedBox.dataset.option;
+
+            // 保存答题记录
+            try {
+                const response = await fetch('/driving/exam/answer', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        question_id: '{{ question_id }}',  // 假设后端提供了问题ID
+                        exam_id: '{{ exam_id }}',  // 假设后端提供了考试ID
+                        // selectedOption: selectedOption,
+                        is_correct: isCorrect
+                    }),
+                });
+
+                if (!response.ok) {
+                    throw new Error('保存答题记录失败');
+                }
+            } catch (error) {
+                console.error('保存答题记录时出错:', error);
+                // 这里可以添加一些错误处理逻辑，比如显示一个错误消息给用户
+            }
+
+            // 显示正确答案和用户选择
             document.querySelectorAll('.option-box').forEach(box => {
                 box.classList.add('disabled');
                 box.classList.remove('correct', 'incorrect');
                 if (box.dataset.correct === 'true') {
                     box.classList.add('correct');
-                } else if (box === selectedBox && selectedBox.dataset.correct !== 'true') {
+                } else if (box === selectedBox && !isCorrect) {
                     box.classList.add('incorrect');
                 }
             });
 
-            // 启用"下一题"按钮
-            nextButton.classList.remove('btn-disabled');
-            nextButton.disabled = false;
+            if (isCorrect) {
+               setTimeout(nextQuestion, 2000);
+            } else {
+                nextButton.style.display = 'block';
+            }
         }
 
         function nextQuestion() {

@@ -2,8 +2,8 @@ use axum::{
     extract::{Path, State},
     http::header,
     response::{AppendHeaders, Html, IntoResponse},
-    routing::get,
-    Error, Router,
+    routing::{get, post},
+    Error, Json, Router,
 };
 use lazy_static::lazy_static;
 use log::{info, warn};
@@ -55,7 +55,7 @@ async fn main() {
     let app = Router::new()
         .route("/", get(index))
         .route("/driving/exam/:exam_id", get(exam_question))
-        //.route("/captcha", get(generate_captcha)) // 新增的路由
+        .route("/driving/exam/answer", post(exam_answer))
         .fallback(fallback)
         .layer(CookieManagerLayer::new()) // 添加此行以启用 Cookie 管理
         .with_state(state);
@@ -82,10 +82,17 @@ struct ExamRecord {
     is_correct: Option<i64>,
 }
 
-#[derive(Debug,Deserialize,Serialize)]
+#[derive(Debug, Deserialize, Serialize)]
 struct QuestionOption {
     id: String,
     content: String,
+    is_correct: bool,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+struct Answer {
+    exam_id: String,
+    question_id: String,
     is_correct: bool,
 }
 
@@ -109,6 +116,29 @@ async fn get_all_question_ids(pool: &SqlitePool) -> Vec<String> {
     questions
 }
 
+async fn exam_answer(
+    State(state): State<AppState>,
+    Json(answer): Json<Answer>,
+) -> impl IntoResponse {
+    // 处理答题记录
+    let record = ExamRecord {
+        exam_id: Some(answer.exam_id),
+        question_id: Some(answer.question_id),
+        is_correct: Some(answer.is_correct as i64),
+    };
+    sqlx::query!(
+        "INSERT INTO exam_record (exam_id, question_id, is_correct) VALUES ($1, $2, $3)",
+        record.exam_id,
+        record.question_id,
+        record.is_correct
+    )
+    .execute(&state.pool)
+    .await
+    .unwrap();
+
+    "答题记录已保存".into_response()
+}
+
 async fn exam_question(Path(exam_id): Path<String>, State(state): State<AppState>) -> Html<String> {
     // 从state.questions随机取出一个id
     let question_id = state.questions.choose(&mut rand::thread_rng()).unwrap();
@@ -123,7 +153,8 @@ async fn exam_question(Path(exam_id): Path<String>, State(state): State<AppState
     // question.options 转化为 options
     let options: Vec<QuestionOption> = serde_json::from_str(&question.options.unwrap()).unwrap();
     let mut context = Context::new();
-    context.insert("question_id", &exam_id);
+    context.insert("exam_id", &exam_id);
+    context.insert("question_id", &question_id);
     context.insert("question_images", &question_images);
     context.insert("question_content", &question.content);
     context.insert("options", &options);
@@ -151,7 +182,7 @@ async fn index(cookies: Cookies) -> impl IntoResponse {
     let cookie = format!("exam_id={}; Path=/; HttpOnly; Max-Age=10800", exam_id);
     let headers = AppendHeaders([(header::SET_COOKIE, cookie)]);
     let mut context = Context::new();
-    context.insert("start_exam_url", &format!("/exam/{}", exam_id));
+    context.insert("start_exam_url", &format!("/driving/exam/{}", exam_id));
     let html = TEMPLATES.render("index.html", &context);
     match html {
         Ok(t) => (headers, Html(t)),
