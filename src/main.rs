@@ -6,11 +6,9 @@ use axum::{
     Error, Json, Router,
 };
 use lazy_static::lazy_static;
-use log::{info, warn};
 use rand::seq::SliceRandom;
 use serde::{Deserialize, Serialize};
 use sqlx::{pool::PoolOptions, SqlitePool};
-use std::env::set_var;
 use tera::{Context, Tera};
 use tower_cookies::{Cookie, CookieManagerLayer, Cookies};
 use uuid::Uuid;
@@ -37,15 +35,18 @@ struct AppState {
 #[tokio::main]
 async fn main() {
     dotenv::dotenv().ok();
-    // 初始化日志,设置日志级别
-    set_var("RUST_LOG", "debug");
-    pretty_env_logger::init_timed();
-
+    tracing_subscriber::fmt()
+        .pretty()
+        .with_thread_names(true)
+        // enable everything
+        .with_max_level(tracing::Level::INFO)
+        // sets this to be the default, global collector for this application.
+        .init();
     // 数据库连接池
     let db = init_db().await.unwrap();
 
     let questions = get_all_question_ids(&db).await;
-    info!("there have {} questions ", questions.len());
+    tracing::info!("there have {} questions ", questions.len());
     let state = AppState {
         pool: db,
         questions,
@@ -55,15 +56,15 @@ async fn main() {
     let app = Router::new()
         .route("/", get(index))
         .route("/restart", get(restart))
-        .route("/driving/exam/:exam_id", get(exam_question))
-        .route("/driving/exam/answer", post(exam_answer))
+        .route("/driving/class7test/:exam_id", get(exam_question))
+        .route("/driving/class7test/answer", post(exam_answer))
         .fallback(fallback)
         .layer(CookieManagerLayer::new()) // 添加此行以启用 Cookie 管理
         .with_state(state);
 
     // run our app with hyper, listening globally on port 3000
     let listener = tokio::net::TcpListener::bind("0.0.0.0:8080").await.unwrap();
-    info!("Server running on: {}", listener.local_addr().unwrap());
+    tracing::info!("Server running on: {}", listener.local_addr().unwrap());
     axum::serve(listener, app).await.unwrap()
 }
 
@@ -151,7 +152,6 @@ async fn exam_answer(
 }
 
 async fn exam_question(Path(exam_id): Path<String>, State(state): State<AppState>) -> Html<String> {
-    info!("exam_id:{}", exam_id);
     // 查询 exam_record , 这个sql返回的是一个集合
     let exam_question_ids: Vec<String> =
         sqlx::query_scalar("SELECT DISTINCT question_id FROM exam_record WHERE exam_id = ?")
@@ -168,17 +168,24 @@ async fn exam_question(Path(exam_id): Path<String>, State(state): State<AppState
         .collect::<Vec<String>>();
     // 如果question_ids为空，表示用户已答完所有题目
     if question_ids.is_empty() {
+        tracing::info!("user has finished all questions. exam_id:{}", exam_id);
         // 跳转到completed页面
         let mut context = Context::new();
         context.insert("exam_id", &exam_id);
         context.insert("total_questions", &state.questions.len());
         context.insert("correct_answers", &exam_question_ids.len());
-        context.insert("accuracy", &format!("{:.2}%", (exam_question_ids.len() as f64 / state.questions.len() as f64) * 100.0));
+        context.insert(
+            "accuracy",
+            &format!(
+                "{:.2}%",
+                (exam_question_ids.len() as f64 / state.questions.len() as f64) * 100.0
+            ),
+        );
         let html = TEMPLATES.render("completed.html", &context);
         match html {
             Ok(t) => return Html(t),
             Err(e) => {
-                warn!("Error: {:?}", e);
+                tracing::error!("Error: {:?}", e);
                 return Html(format!("错误: {}", e));
             }
         }
@@ -205,7 +212,7 @@ async fn exam_question(Path(exam_id): Path<String>, State(state): State<AppState
     match html {
         Ok(t) => Html(t),
         Err(e) => {
-            warn!("Error: {:?}", e);
+            tracing::error!("Error: {:?}", e);
             return Html(format!("错误: {}", e));
         }
     }
@@ -216,7 +223,7 @@ async fn index(cookies: Cookies) -> impl IntoResponse {
         || {
             // 如果没有cookie则生成新的exam_id
             let id = Uuid::new_v4().to_string();
-            info!("generate a new exam_id:{}", &id);
+            tracing::info!("generate a new exam_id:{}", &id);
             id
         },
         |cookie| cookie.value().to_string(),
