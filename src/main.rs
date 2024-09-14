@@ -53,8 +53,8 @@ async fn main() {
     };
 
     let class7_tests_router = Router::new()
-        .route("/:exam_id", get(testing))
-        .route("/answers", post(answers));
+        .route("/:exam_id", get(get_exam))
+        .route("/submit_answers", post(submit_answers));
 
     // build our application with a route
     let app = Router::new()
@@ -124,7 +124,7 @@ async fn get_all_question_ids(pool: &SqlitePool) -> Vec<String> {
     questions
 }
 
-async fn answers(State(state): State<AppState>, Json(answer): Json<Answer>) -> impl IntoResponse {
+async fn submit_answers(State(state): State<AppState>, Json(answer): Json<Answer>) -> impl IntoResponse {
     // 处理答题记录
     let record = ExamRecord {
         exam_id: Some(answer.exam_id),
@@ -146,7 +146,7 @@ async fn answers(State(state): State<AppState>, Json(answer): Json<Answer>) -> i
     "answer saved".into_response()
 }
 
-async fn testing(Path(exam_id): Path<String>, State(state): State<AppState>) -> Html<String> {
+async fn get_exam(Path(exam_id): Path<String>, State(state): State<AppState>) -> Html<String> {
     // 查询 exam_record , 这个sql返回的是一个集合
     let exam_question_ids: Vec<String> =
         sqlx::query_scalar("SELECT DISTINCT question_id FROM exam_record WHERE exam_id = ?")
