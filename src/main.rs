@@ -52,12 +52,15 @@ async fn main() {
         questions,
     };
 
+    let class7_tests_router = Router::new()
+        .route("/:exam_id", get(testing))
+        .route("/answers", post(answers));
+
     // build our application with a route
     let app = Router::new()
         .route("/", get(index))
         .route("/restart", get(restart))
-        .route("/driving/class7test/:exam_id", get(exam_question))
-        .route("/driving/class7test/answer", post(exam_answer))
+        .nest("/v1/driving/class7-tests", class7_tests_router)
         .fallback(fallback)
         .layer(CookieManagerLayer::new()) // 添加此行以启用 Cookie 管理
         .with_state(state);
@@ -68,7 +71,6 @@ async fn main() {
     axum::serve(listener, app).await.unwrap()
 }
 
-/// 定义Question结构体
 #[derive(sqlx::FromRow, Debug, Deserialize, Serialize)]
 struct Question {
     id: Option<String>,
@@ -99,13 +101,10 @@ struct Answer {
 }
 
 async fn restart(cookies: Cookies) -> Redirect {
-    // 清除 exam_id cookie
     cookies.remove(Cookie::new("exam_id", ""));
-    // 重定向到首页
     Redirect::to("/")
 }
 
-// fallback handler
 async fn fallback() -> Html<String> {
     let html = TEMPLATES.render("404.html", &Context::new());
     match html {
@@ -125,15 +124,11 @@ async fn get_all_question_ids(pool: &SqlitePool) -> Vec<String> {
     questions
 }
 
-async fn exam_answer(
-    State(state): State<AppState>,
-    Json(answer): Json<Answer>,
-) -> impl IntoResponse {
+async fn answers(State(state): State<AppState>, Json(answer): Json<Answer>) -> impl IntoResponse {
     // 处理答题记录
     let record = ExamRecord {
         exam_id: Some(answer.exam_id),
         question_id: Some(answer.question_id),
-        // 获取当前时间格式“2024-05-01 12:00:00”
         created_at: Some(chrono::Utc::now().to_string()),
         is_correct: Some(answer.is_correct as i64),
     };
@@ -151,7 +146,7 @@ async fn exam_answer(
     "answer saved".into_response()
 }
 
-async fn exam_question(Path(exam_id): Path<String>, State(state): State<AppState>) -> Html<String> {
+async fn testing(Path(exam_id): Path<String>, State(state): State<AppState>) -> Html<String> {
     // 查询 exam_record , 这个sql返回的是一个集合
     let exam_question_ids: Vec<String> =
         sqlx::query_scalar("SELECT DISTINCT question_id FROM exam_record WHERE exam_id = ?")
@@ -231,7 +226,7 @@ async fn index(cookies: Cookies) -> impl IntoResponse {
     let cookie = format!("exam_id={}; Path=/; HttpOnly; Max-Age=10800", exam_id);
     let headers = AppendHeaders([(header::SET_COOKIE, cookie)]);
     let mut context = Context::new();
-    context.insert("start_exam_url", &format!("/driving/exam/{}", exam_id));
+    context.insert("start_exam_url", &format!("/v1/driving/class7-tests/{}", exam_id));
     let html = TEMPLATES.render("index.html", &context);
     match html {
         Ok(t) => (headers, Html(t)),
