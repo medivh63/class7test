@@ -18,8 +18,8 @@ lazy_static! {
         let mut tera = match Tera::new("templates/pages/*") {
             Ok(t) => t,
             Err(e) => {
-                println!("Parsing error(s): {}", e);
-                ::std::process::exit(1);
+                tracing::error!("Parsing error(s): {}", e);
+                Tera::default()
             }
         };
         tera.autoescape_on(vec![".html"]);
