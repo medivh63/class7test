@@ -53,14 +53,14 @@ async fn main() {
     };
 
     let class7_tests_router = Router::new()
-        .route("/:exam_id", get(get_exam))
+        .route("/:practice_id", get(practice))
         .route("/submit_answers", post(submit_answers));
 
     // build our application with a route
     let app = Router::new()
         .route("/", get(index))
         .route("/restart", get(restart))
-        .nest("/v1/driving/class7-tests", class7_tests_router)
+        .nest("/v1/driving/class7/practice", class7_tests_router)
         .fallback(fallback)
         .layer(CookieManagerLayer::new()) // 添加此行以启用 Cookie 管理
         .with_state(state);
@@ -81,7 +81,7 @@ struct Question {
 
 #[derive(sqlx::FromRow, Debug, Deserialize, Serialize)]
 struct ExamRecord {
-    exam_id: Option<String>,
+    practice_id: Option<String>,
     question_id: Option<String>,
     is_correct: Option<i64>,
     created_at: Option<String>,
@@ -95,13 +95,13 @@ struct QuestionOption {
 
 #[derive(Debug, Deserialize, Serialize)]
 struct Answer {
-    exam_id: String,
+    practice_id: String,
     question_id: String,
     is_correct: bool,
 }
 
 async fn restart(cookies: Cookies) -> Redirect {
-    cookies.remove(Cookie::new("exam_id", ""));
+    cookies.remove(Cookie::new("practice_id", ""));
     Redirect::to("/")
 }
 
@@ -127,14 +127,14 @@ async fn get_all_question_ids(pool: &SqlitePool) -> Vec<String> {
 async fn submit_answers(State(state): State<AppState>, Json(answer): Json<Answer>) -> impl IntoResponse {
     // 处理答题记录
     let record = ExamRecord {
-        exam_id: Some(answer.exam_id),
+        practice_id: Some(answer.practice_id),
         question_id: Some(answer.question_id),
         created_at: Some(chrono::Utc::now().to_string()),
         is_correct: Some(answer.is_correct as i64),
     };
     sqlx::query!(
-        "INSERT INTO exam_record (exam_id, question_id, is_correct, created_at) VALUES ($1, $2, $3, $4)",
-        record.exam_id,
+        "INSERT INTO practice_record (practice_id, question_id, is_correct, created_at) VALUES ($1, $2, $3, $4)",
+        record.practice_id,
         record.question_id,
         record.is_correct,
         record.created_at
@@ -146,11 +146,11 @@ async fn submit_answers(State(state): State<AppState>, Json(answer): Json<Answer
     "answer saved".into_response()
 }
 
-async fn get_exam(Path(exam_id): Path<String>, State(state): State<AppState>) -> Html<String> {
+async fn practice(Path(practice_id): Path<String>, State(state): State<AppState>) -> Html<String> {
     // 查询 exam_record , 这个sql返回的是一个集合
     let exam_question_ids: Vec<String> =
-        sqlx::query_scalar("SELECT DISTINCT question_id FROM exam_record WHERE exam_id = ?")
-            .bind(&exam_id)
+        sqlx::query_scalar("SELECT DISTINCT question_id FROM practice_record WHERE practice_id = ?")
+            .bind(&practice_id)
             .fetch_all(&state.pool)
             .await
             .unwrap();
@@ -163,10 +163,10 @@ async fn get_exam(Path(exam_id): Path<String>, State(state): State<AppState>) ->
         .collect::<Vec<String>>();
     // 如果question_ids为空，表示用户已答完所有题目
     if question_ids.is_empty() {
-        tracing::info!("user has finished all questions. exam_id:{}", exam_id);
+        tracing::info!("user has finished all questions. practice_id:{}", practice_id);
         // 跳转到completed页面
         let mut context = Context::new();
-        context.insert("exam_id", &exam_id);
+        context.insert("practice_id", &practice_id);
         context.insert("total_questions", &state.questions.len());
         context.insert("correct_answers", &exam_question_ids.len());
         context.insert(
@@ -196,14 +196,14 @@ async fn get_exam(Path(exam_id): Path<String>, State(state): State<AppState>) ->
     let question_images = vec![question.images];
     let options: Vec<QuestionOption> = serde_json::from_str(&question.options.unwrap()).unwrap();
     let mut context = Context::new();
-    context.insert("exam_id", &exam_id);
+    context.insert("practice_id", &practice_id);
     context.insert("question_id", &question_id);
     context.insert("question_images", &question_images);
     context.insert("question_content", &question.content);
     context.insert("current_question_number", &question_ids.len());
     context.insert("total_questions", &state.questions.len());
     context.insert("options", &options);
-    let html = TEMPLATES.render("question.html", &context);
+    let html = TEMPLATES.render("practice.html", &context);
     match html {
         Ok(t) => Html(t),
         Err(e) => {
@@ -214,19 +214,19 @@ async fn get_exam(Path(exam_id): Path<String>, State(state): State<AppState>) ->
 }
 
 async fn index(cookies: Cookies) -> impl IntoResponse {
-    let exam_id = cookies.get("exam_id").map_or_else(
+    let practice_id = cookies.get("practice_id").map_or_else(
         || {
-            // 如果没有cookie则生成新的exam_id
+            // 如果没有cookie则生成新的practice_id
             let id = Uuid::new_v4().to_string();
-            tracing::info!("generate a new exam_id:{}", &id);
+            tracing::info!("generate a new practice_id:{}", &id);
             id
         },
         |cookie| cookie.value().to_string(),
     );
-    let cookie = format!("exam_id={}; Path=/; HttpOnly; Max-Age=10800", exam_id);
+    let cookie = format!("practice_id={}; Path=/; HttpOnly; Max-Age=10800", practice_id);
     let headers = AppendHeaders([(header::SET_COOKIE, cookie)]);
     let mut context = Context::new();
-    context.insert("start_exam_url", &format!("/v1/driving/class7-tests/{}", exam_id));
+    context.insert("start_exam_url", &format!("/v1/driving/class7-tests/{}", practice_id));
     let html = TEMPLATES.render("index.html", &context);
     match html {
         Ok(t) => (headers, Html(t)),
