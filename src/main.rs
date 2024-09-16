@@ -100,11 +100,13 @@ struct Answer {
     is_correct: bool,
 }
 
+/// 重新开始
 async fn restart(cookies: Cookies) -> Redirect {
     cookies.remove(Cookie::new("practice_id", ""));
     Redirect::to("/")
 }
 
+/// 404页面
 async fn fallback() -> Html<String> {
     let html = TEMPLATES.render("404.html", &Context::new());
     match html {
@@ -113,6 +115,7 @@ async fn fallback() -> Html<String> {
     }
 }
 
+/// 获取所有题目id
 async fn get_all_question_ids(pool: &SqlitePool) -> Vec<String> {
     let questions: Vec<String> = sqlx::query!("SELECT id FROM question")
         .fetch_all(pool)
@@ -124,6 +127,7 @@ async fn get_all_question_ids(pool: &SqlitePool) -> Vec<String> {
     questions
 }
 
+/// 保存答题记录
 async fn practice_answers(
     State(state): State<AppState>,
     Json(answer): Json<Answer>,
@@ -149,6 +153,35 @@ async fn practice_answers(
     "answer saved".into_response()
 }
 
+/// 首页
+async fn index(cookies: Cookies) -> impl IntoResponse {
+    let practice_id = cookies.get("practice_id").map_or_else(
+        || {
+            // 如果没有cookie则生成新的practice_id
+            let id = Uuid::new_v4().to_string();
+            tracing::info!("generate a new practice_id:{}", &id);
+            id
+        },
+        |cookie| cookie.value().to_string(),
+    );
+    let cookie = format!(
+        "practice_id={}; Path=/; HttpOnly; Max-Age=10800",
+        practice_id
+    );
+    let headers = AppendHeaders([(header::SET_COOKIE, cookie)]);
+    let mut context = Context::new();
+    context.insert(
+        "start_practice_url",
+        &format!("/v1/driving/class7/practice/{}", practice_id),
+    );
+    let html = TEMPLATES.render("index.html", &context);
+    match html {
+        Ok(t) => (headers, Html(t)),
+        Err(e) => (headers, Html(format!("错误: {}", e))),
+    }
+}
+
+/// 开始练习
 async fn practice(Path(practice_id): Path<String>, State(state): State<AppState>) -> Html<String> {
     // 查询 exam_record , 这个sql返回的是一个集合
     let practice_question_ids: Vec<String> = sqlx::query_scalar(
@@ -217,33 +250,6 @@ async fn practice(Path(practice_id): Path<String>, State(state): State<AppState>
             tracing::error!("Error: {:?}", e);
             return Html(format!("错误: {}", e));
         }
-    }
-}
-
-async fn index(cookies: Cookies) -> impl IntoResponse {
-    let practice_id = cookies.get("practice_id").map_or_else(
-        || {
-            // 如果没有cookie则生成新的practice_id
-            let id = Uuid::new_v4().to_string();
-            tracing::info!("generate a new practice_id:{}", &id);
-            id
-        },
-        |cookie| cookie.value().to_string(),
-    );
-    let cookie = format!(
-        "practice_id={}; Path=/; HttpOnly; Max-Age=10800",
-        practice_id
-    );
-    let headers = AppendHeaders([(header::SET_COOKIE, cookie)]);
-    let mut context = Context::new();
-    context.insert(
-        "start_practice_url",
-        &format!("/v1/driving/class7/practice/{}", practice_id),
-    );
-    let html = TEMPLATES.render("index.html", &context);
-    match html {
-        Ok(t) => (headers, Html(t)),
-        Err(e) => (headers, Html(format!("错误: {}", e))),
     }
 }
 
