@@ -1,15 +1,53 @@
-# 构建阶段
+# 使用官方Rust镜像作为构建环境
 FROM rust:1.76 as builder
+
+# 设置工作目录
 WORKDIR /usr/src/app
-COPY . .
+
+# 复制Cargo.toml和Cargo.lock文件
+COPY Cargo.toml Cargo.lock ./
+
+# 创建一个虚拟的main.rs文件,用于缓存依赖
+RUN mkdir src && echo "fn main() {}" > src/main.rs
+
+# 构建依赖
 RUN cargo build --release
 
-# 运行阶段
-FROM debian:bullseye-slim
-RUN apt-get update && apt-get install -y libsqlite3-0 && rm -rf /var/lib/apt/lists/*
-COPY --from=builder /usr/src/app/target/release/class7test /usr/local/bin/app
-COPY --from=builder /usr/src/app/templates /templates
-COPY --from=builder /usr/src/app/.env /.env
+# 删除虚拟的main.rs文件
+RUN rm -f src/main.rs
 
-EXPOSE 8080
+# 复制实际的源代码
+COPY src ./src
+COPY templates ./templates
+
+# 构建实际的应用
+RUN cargo build --release
+
+# 使用一个轻量级的基础镜像作为运行环境
+FROM debian:bookworm-slim
+
+# 安装SSL证书和SQLite3
+RUN apt-get update && apt-get install -y ca-certificates sqlite3 libsqlite3-0 && rm -rf /var/lib/apt/lists/*
+
+# 从构建阶段复制编译好的二进制文件
+COPY --from=builder /usr/src/app/target/release/class7-practice /usr/local/bin/app
+
+# 复制模板文件
+COPY --from=builder /usr/src/app/templates /usr/local/bin/templates
+
+# 创建数据目录
+RUN mkdir /data
+
+COPY local.db /data/local.db
+
+# 设置工作目录
+WORKDIR /usr/local/bin
+
+# 暴露3000端口
+EXPOSE 3000
+
+# 设置环境变量指定数据库路径
+ENV DATABASE_URL=/data/local.db
+
+# 运行应用
 CMD ["app"]
