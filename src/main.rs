@@ -35,13 +35,15 @@ struct AppState {
 #[tokio::main]
 async fn main() {
     dotenv::dotenv().ok();
+    let file_appender = tracing_appender::rolling::daily("logs", "app.log");
+    let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
     tracing_subscriber::fmt()
         .pretty()
         .with_thread_names(true)
-        // enable everything
         .with_max_level(tracing::Level::DEBUG)
-        // sets this to be the default, global collector for this application.
+        .with_writer(non_blocking) // 将日志输出到文件
         .init();
+
     // 数据库连接池
     let database = init_db().await.unwrap();
 
