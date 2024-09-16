@@ -39,34 +39,34 @@ async fn main() {
         .pretty()
         .with_thread_names(true)
         // enable everything
-        .with_max_level(tracing::Level::INFO)
+        .with_max_level(tracing::Level::DEBUG)
         // sets this to be the default, global collector for this application.
         .init();
     // 数据库连接池
-    let db = init_db().await.unwrap();
+    let database = init_db().await.unwrap();
 
-    let questions = get_all_question_ids(&db).await;
+    let questions = get_all_question_ids(&database).await;
     tracing::info!("there have {} questions ", questions.len());
     let state = AppState {
-        pool: db,
+        pool: database,
         questions,
     };
 
     let class7_tests_router = Router::new()
-        .route("/:practice_id", get(practice))
-        .route("/submit_answers", post(submit_answers));
+        .route("/practice/:practice_id", get(practice))
+        .route("/practice-answers", post(practice_answers));
 
     // build our application with a route
     let app = Router::new()
         .route("/", get(index))
         .route("/restart", get(restart))
-        .nest("/v1/driving/class7/practice", class7_tests_router)
+        .nest("/v1/driving/class7", class7_tests_router)
         .fallback(fallback)
         .layer(CookieManagerLayer::new()) // 添加此行以启用 Cookie 管理
         .with_state(state);
 
     // run our app with hyper, listening globally on port 3000
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:8080").await.unwrap();
+    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
     tracing::info!("Server running on: {}", listener.local_addr().unwrap());
     axum::serve(listener, app).await.unwrap()
 }
@@ -80,7 +80,7 @@ struct Question {
 }
 
 #[derive(sqlx::FromRow, Debug, Deserialize, Serialize)]
-struct ExamRecord {
+struct PracticeRecord {
     practice_id: Option<String>,
     question_id: Option<String>,
     is_correct: Option<i64>,
@@ -124,9 +124,12 @@ async fn get_all_question_ids(pool: &SqlitePool) -> Vec<String> {
     questions
 }
 
-async fn submit_answers(State(state): State<AppState>, Json(answer): Json<Answer>) -> impl IntoResponse {
+async fn practice_answers(
+    State(state): State<AppState>,
+    Json(answer): Json<Answer>,
+) -> impl IntoResponse {
     // 处理答题记录
-    let record = ExamRecord {
+    let record = PracticeRecord {
         practice_id: Some(answer.practice_id),
         question_id: Some(answer.question_id),
         created_at: Some(chrono::Utc::now().to_string()),
@@ -148,32 +151,36 @@ async fn submit_answers(State(state): State<AppState>, Json(answer): Json<Answer
 
 async fn practice(Path(practice_id): Path<String>, State(state): State<AppState>) -> Html<String> {
     // 查询 exam_record , 这个sql返回的是一个集合
-    let exam_question_ids: Vec<String> =
-        sqlx::query_scalar("SELECT DISTINCT question_id FROM practice_record WHERE practice_id = ?")
-            .bind(&practice_id)
-            .fetch_all(&state.pool)
-            .await
-            .unwrap();
+    let practice_question_ids: Vec<String> = sqlx::query_scalar(
+        "SELECT DISTINCT question_id FROM practice_record WHERE practice_id = ?",
+    )
+    .bind(&practice_id)
+    .fetch_all(&state.pool)
+    .await
+    .unwrap();
     // 从state.questions和exam_question_ids取差集
     let question_ids = state
         .questions
         .clone()
         .into_iter()
-        .filter(|id| !exam_question_ids.contains(id))
+        .filter(|id| !practice_question_ids.contains(id))
         .collect::<Vec<String>>();
     // 如果question_ids为空，表示用户已答完所有题目
     if question_ids.is_empty() {
-        tracing::info!("user has finished all questions. practice_id:{}", practice_id);
+        tracing::info!(
+            "user has finished all questions. practice_id:{}",
+            practice_id
+        );
         // 跳转到completed页面
         let mut context = Context::new();
         context.insert("practice_id", &practice_id);
         context.insert("total_questions", &state.questions.len());
-        context.insert("correct_answers", &exam_question_ids.len());
+        context.insert("correct_answers", &practice_question_ids.len());
         context.insert(
             "accuracy",
             &format!(
                 "{:.2}%",
-                (exam_question_ids.len() as f64 / state.questions.len() as f64) * 100.0
+                (practice_question_ids.len() as f64 / state.questions.len() as f64) * 100.0
             ),
         );
         let html = TEMPLATES.render("completed.html", &context);
@@ -223,10 +230,16 @@ async fn index(cookies: Cookies) -> impl IntoResponse {
         },
         |cookie| cookie.value().to_string(),
     );
-    let cookie = format!("practice_id={}; Path=/; HttpOnly; Max-Age=10800", practice_id);
+    let cookie = format!(
+        "practice_id={}; Path=/; HttpOnly; Max-Age=10800",
+        practice_id
+    );
     let headers = AppendHeaders([(header::SET_COOKIE, cookie)]);
     let mut context = Context::new();
-    context.insert("start_exam_url", &format!("/v1/driving/class7-tests/{}", practice_id));
+    context.insert(
+        "start_practice_url",
+        &format!("/v1/driving/class7/practice/{}", practice_id),
+    );
     let html = TEMPLATES.render("index.html", &context);
     match html {
         Ok(t) => (headers, Html(t)),
