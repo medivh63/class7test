@@ -1,5 +1,5 @@
 # 使用官方Rust镜像作为构建环境
-FROM rust:1.80.1 AS builder
+FROM rust:1.81.0-slim-bookworm AS builder
 
 # 设置工作目录
 WORKDIR /usr/src/app
@@ -23,9 +23,6 @@ COPY templates ./templates
 # 构建实际的应用
 RUN cargo build --release
 
-# 使用一个轻量级的基础镜像作为运行环境
-FROM debian:bookworm-slim
-
 # 安装SSL证书和SQLite3
 RUN apt-get update && apt-get install -y ca-certificates sqlite3 libsqlite3-0 && rm -rf /var/lib/apt/lists/*
 
@@ -38,7 +35,7 @@ COPY --from=builder /usr/src/app/templates /usr/local/bin/templates
 # 创建数据目录
 RUN mkdir /data
 
-COPY local.db /data/local.db
+COPY local.db /var/local.db
 
 # 设置工作目录
 WORKDIR /usr/local/bin
@@ -47,7 +44,7 @@ WORKDIR /usr/local/bin
 EXPOSE 3000
 
 # 设置环境变量指定数据库路径
-ENV DATABASE_URL=/data/local.db
+ENV DATABASE_URL=/var/local.db
 
 # 运行应用
 CMD ["app"]
