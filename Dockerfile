@@ -1,5 +1,5 @@
 # 使用官方Rust镜像作为构建环境
-FROM rust:1.81.0-slim-bookworm AS builder
+FROM --platform=$BUILDPLATFORM rust:1.81.0-slim-bookworm AS builder
 
 # 设置工作目录
 WORKDIR /usr/src/app
@@ -27,7 +27,7 @@ RUN cargo build --release
 RUN apt-get update && apt-get install -y ca-certificates sqlite3 libsqlite3-0 && rm -rf /var/lib/apt/lists/*
 
 # 从构建阶段复制编译好的二进制文件
-COPY --from=builder /usr/src/app/target/release/class7-practice /usr/local/bin/app
+FROM --platform=$TARGETPLATFORM debian:bookworm-slim
 
 # 复制模板文件
 COPY --from=builder /usr/src/app/templates /usr/local/bin/templates
