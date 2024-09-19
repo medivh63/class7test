@@ -23,10 +23,6 @@ COPY templates ./templates
 # 构建实际的应用
 RUN cargo build --release
 
-# 列出所有文件夹
-RUN ls -la /usr/src/app
-RUN ls -la /usr/src/app/target/release
-
 # 安装SSL证书和SQLite3
 RUN apt-get update && apt-get install -y ca-certificates sqlite3 libsqlite3-0 && rm -rf /var/lib/apt/lists/*
 
