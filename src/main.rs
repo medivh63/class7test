@@ -60,9 +60,9 @@ async fn main() {
 
     // build our application with a route
     let app = Router::new()
-        .route("/", get(index))
+        .route("/class7", get(index))
         .route("/restart", get(restart))
-        .nest("/class7/exam", class7_exams_router)
+        .nest("/exam", class7_exams_router)
         .fallback(fallback)
         .layer(CookieManagerLayer::new()) // 添加此行以启用 Cookie 管理
         .with_state(state);
