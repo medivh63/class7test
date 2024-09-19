@@ -33,7 +33,7 @@ FROM --platform=$TARGETPLATFORM debian:bookworm-slim
 
 # 复制模板文件
 COPY --from=builder /usr/src/app/class7-practice/templates /usr/local/bin/templates
-COPY --from=builder /usr/src/app/class7-practice/target/release/app .
+COPY --from=builder /usr/src/app/class7-practice/target/release/class7-practice .
 
 RUN chmod +x /usr/local/bin/app
 
@@ -52,4 +52,4 @@ EXPOSE 3000
 ENV DATABASE_URL=/var/local.db
 
 # 运行应用
-CMD ["./app"]
+CMD ["./class7-practice"]
