@@ -1,0 +1,12 @@
+  [2m2024-09-19T19:25:26.010456Z[0m [34mDEBUG[0m [1;34msqlx::query[0m[34m: [1;34msummary[0m[34m: "PRAGMA foreign_keys = ON; …", [1;34mdb.statement[0m[34m: "\n\nPRAGMA foreign_keys = ON;\n", [1;34mrows_affected[0m[34m: 0, [1;34mrows_returned[0m[34m: 0, [1;34melapsed[0m[34m: 299.041µs, [1;34melapsed_secs[0m[34m: 0.000299041[0m
+    [2;3mat[0m /Users/medivh/.cargo/registry/src/index.crates.io-6f17d22bba15001f/sqlx-core-0.8.2/src/logger.rs:144 [2;3mon[0m sqlx-sqlite-worker-0
+
+  [2m2024-09-19T19:25:26.011566Z[0m [34mDEBUG[0m [1;34msqlx::query[0m[34m: [1;34msummary[0m[34m: "SELECT id FROM question", [1;34mdb.statement[0m[34m: "", [1;34mrows_affected[0m[34m: 0, [1;34mrows_returned[0m[34m: 1, [1;34melapsed[0m[34m: 754.334µs, [1;34melapsed_secs[0m[34m: 0.000754334[0m
+    [2;3mat[0m /Users/medivh/.cargo/registry/src/index.crates.io-6f17d22bba15001f/sqlx-core-0.8.2/src/logger.rs:144 [2;3mon[0m sqlx-sqlite-worker-0
+
+  [2m2024-09-19T19:25:26.011692Z[0m [32m INFO[0m [1;32mclass7_practice[0m[32m: [32mthere have 1 questions [0m
+    [2;3mat[0m src/main.rs:51 [2;3mon[0m main
+
+  [2m2024-09-19T19:25:26.013149Z[0m [32m INFO[0m [1;32mclass7_practice[0m[32m: [32mServer running on: 0.0.0.0:3000[0m
+    [2;3mat[0m src/main.rs:72 [2;3mon[0m main
+
