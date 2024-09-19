@@ -25,9 +25,12 @@ WORKDIR /app
 
 # 从构建阶段复制编译好的二进制文件
 COPY --from=builder /usr/src/app/target/release/class7-practice .
+# 复制templates
+COPY --from=builder /usr/src/app/templates /app/templates
+
 
 # 创建一个目录用于挂载SQLite数据库
-# RUN mkdir /data
+RUN mkdir /data
 
 # 设置环境变量
 ENV DATABASE_URL=/data/local.db
