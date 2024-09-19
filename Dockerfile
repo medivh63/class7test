@@ -32,6 +32,8 @@ FROM --platform=$TARGETPLATFORM debian:bookworm-slim
 # 复制模板文件
 COPY --from=builder /usr/src/app/templates /usr/local/bin/templates
 
+#RUN chmod +x /usr/local/bin/app
+
 # 创建数据目录
 RUN mkdir /data
 
@@ -47,4 +49,4 @@ EXPOSE 3000
 ENV DATABASE_URL=/var/local.db
 
 # 运行应用
-CMD ["app"]
+CMD ["./app"]
