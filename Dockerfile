@@ -2,7 +2,7 @@
 FROM --platform=$BUILDPLATFORM rust:1.81.0-slim-bookworm AS builder
 
 # 设置工作目录
-WORKDIR /usr/local/bin
+WORKDIR /usr/src/app
 
 # 复制Cargo.toml和Cargo.lock文件
 COPY Cargo.toml Cargo.lock ./
@@ -31,14 +31,15 @@ FROM --platform=$TARGETPLATFORM debian:bookworm-slim
 
 # 复制模板文件
 COPY --from=builder /usr/src/app/templates /usr/local/bin/templates
-COPY --from=builder /usr/src/app/target/release/class7-practice ./class7-practice
-
-RUN ls -la /usr/local/bin/
+COPY --from=builder /usr/src/app/target/release/class7-practice /usr/local/bin/class7-practice
 
 # 创建数据目录
 RUN mkdir /data
 
 COPY local.db /var/local.db
+
+# 设置工作目录
+WORKDIR /usr/local/bin
 
 # 暴露3000端口
 EXPOSE 3000
