@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO exam_record (exam_id, question_id, is_correct, created_at) VALUES ($1, $2, $3, $4)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": []
+  },
+  "hash": "c0db0dbbab43ed9b760fc98e33791a18639ecfca0b05122906a27542f5b4ebeb"
+}
