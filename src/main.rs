@@ -55,14 +55,14 @@ async fn main() {
     };
 
     let class7_exams_router = Router::new()
-        .route("/class7/:exam_id", get(exam))
-        .route("/class7/answers", post(exam_answers));
+        .route("/:exam_id", get(exam))
+        .route("/question/answers", post(exam_answers));
 
     // build our application with a route
     let app = Router::new()
         .route("/", get(index))
         .route("/restart", get(restart))
-        .nest("/driving-exam", class7_exams_router)
+        .nest("/class7/exam", class7_exams_router)
         .fallback(fallback)
         .layer(CookieManagerLayer::new()) // 添加此行以启用 Cookie 管理
         .with_state(state);
@@ -174,7 +174,7 @@ async fn index(cookies: Cookies) -> impl IntoResponse {
     let mut context = Context::new();
     context.insert(
         "start_exam_url",
-        &format!("/driving-exam/class7/{}", exam_id),
+        &format!("/class7/exam/{}", exam_id),
     );
     let html = TEMPLATES.render("index.html", &context);
     match html {
