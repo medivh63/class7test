@@ -1,6 +1,6 @@
 # 使用多阶段构建
 # 第一阶段: 构建阶段
-FROM --platform=$BUILDPLATFORM rust:1.81 as builder
+FROM --platform=$BUILDPLATFORM rust:1.81 AS builder
 
 WORKDIR /usr/src/app
 
