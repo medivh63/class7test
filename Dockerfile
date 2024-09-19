@@ -24,7 +24,7 @@ RUN apt-get update && apt-get install -y libsqlite3-0 && rm -rf /var/lib/apt/lis
 WORKDIR /app
 
 # 从构建阶段复制编译好的二进制文件
-COPY --from=builder /usr/src/app/target/release/class7-practice .
+COPY --from=builder /usr/src/app/target/release/class7exam .
 # 复制templates
 COPY --from=builder /usr/src/app/templates /app/templates
 
@@ -39,4 +39,4 @@ ENV DATABASE_URL=/data/local.db
 EXPOSE 3000
 
 # 运行应用
-CMD ["./class7-practice"]
+CMD ["./class7exam"]
