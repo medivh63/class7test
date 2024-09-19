@@ -37,6 +37,8 @@ FROM --platform=$TARGETPLATFORM debian:bookworm-slim
 COPY --from=builder /usr/src/app/templates /usr/local/bin/templates
 COPY --from=builder /usr/src/app/target/release/class7-practice .
 
+RUN ls -la /usr/local/bin/
+
 # 创建数据目录
 RUN mkdir /data
 
