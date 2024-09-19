@@ -54,15 +54,12 @@ async fn main() {
         questions,
     };
 
-    let class7_exams_router = Router::new()
-        .route("/:exam_id", get(exam))
-        .route("/question/answers", post(exam_answers));
-
     // build our application with a route
     let app = Router::new()
         .route("/class7", get(index))
-        .route("/restart", get(restart))
-        .nest("/exam", class7_exams_router)
+        .route("/class7/exam/:exam_id", get(start_exam))
+        .route("/class7/submit_answer", post(submit_answer))
+        .route("/class7/restart", get(restart))
         .fallback(fallback)
         .layer(CookieManagerLayer::new()) // 添加此行以启用 Cookie 管理
         .with_state(state);
@@ -104,8 +101,9 @@ struct Answer {
 
 /// 重新开始
 async fn restart(cookies: Cookies) -> Redirect {
+    tracing::info!("restart exam {}", cookies.get("exam_id").unwrap().value());
     cookies.remove(Cookie::new("exam_id", ""));
-    Redirect::to("/")
+    Redirect::to("/class7")
 }
 
 /// 404页面
@@ -129,8 +127,8 @@ async fn get_all_question_ids(pool: &SqlitePool) -> Vec<String> {
     questions
 }
 
-/// 保存答题记录
-async fn exam_answers(
+/// 提交问题
+async fn submit_answer(
     State(state): State<AppState>,
     Json(answer): Json<Answer>,
 ) -> impl IntoResponse {
@@ -166,16 +164,10 @@ async fn index(cookies: Cookies) -> impl IntoResponse {
         },
         |cookie| cookie.value().to_string(),
     );
-    let cookie = format!(
-        "exam_id={}; Path=/; HttpOnly; Max-Age=10800",
-        exam_id
-    );
+    let cookie = format!("exam_id={}; Path=/class7; HttpOnly; Max-Age=10800", exam_id);
     let headers = AppendHeaders([(header::SET_COOKIE, cookie)]);
     let mut context = Context::new();
-    context.insert(
-        "start_exam_url",
-        &format!("/class7/exam/{}", exam_id),
-    );
+    context.insert("start_exam_url", &format!("/class7/exam/{}", exam_id));
     let html = TEMPLATES.render("index.html", &context);
     match html {
         Ok(t) => (headers, Html(t)),
@@ -184,15 +176,14 @@ async fn index(cookies: Cookies) -> impl IntoResponse {
 }
 
 /// 开始练习
-async fn exam(Path(exam_id): Path<String>, State(state): State<AppState>) -> Html<String> {
+async fn start_exam(Path(exam_id): Path<String>, State(state): State<AppState>) -> Html<String> {
     // 查询 exam_record , 这个sql返回的是一个集合
-    let exam_question_ids: Vec<String> = sqlx::query_scalar(
-        "SELECT DISTINCT question_id FROM exam_record WHERE exam_id = ?",
-    )
-    .bind(&exam_id)
-    .fetch_all(&state.pool)
-    .await
-    .unwrap();
+    let exam_question_ids: Vec<String> =
+        sqlx::query_scalar("SELECT DISTINCT question_id FROM exam_record WHERE exam_id = ?")
+            .bind(&exam_id)
+            .fetch_all(&state.pool)
+            .await
+            .unwrap();
     // 从state.questions和exam_question_ids取差集
     let question_ids = state
         .questions
@@ -202,10 +193,7 @@ async fn exam(Path(exam_id): Path<String>, State(state): State<AppState>) -> Htm
         .collect::<Vec<String>>();
     // 如果question_ids为空，表示用户已答完所有题目
     if question_ids.is_empty() {
-        tracing::info!(
-            "user has finished all questions. exam_id:{}",
-            exam_id
-        );
+        tracing::info!("user has finished all questions. exam_id:{}", exam_id);
         // 跳转到completed页面
         let mut context = Context::new();
         context.insert("exam_id", &exam_id);
