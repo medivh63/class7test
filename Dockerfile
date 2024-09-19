@@ -1,6 +1,7 @@
 # 使用官方Rust镜像作为构建环境
 FROM --platform=$BUILDPLATFORM rust:1.81.0-slim-bookworm AS builder
 
+
 # 设置工作目录
 WORKDIR /usr/src/app
 
