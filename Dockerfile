@@ -32,8 +32,8 @@ RUN apt-get update && apt-get install -y ca-certificates sqlite3 libsqlite3-0 &&
 FROM --platform=$TARGETPLATFORM debian:bookworm-slim
 
 # 复制模板文件
-COPY --from=builder /usr/src/app/templates /usr/local/bin/templates
-COPY --from=builder /usr/src/app/target/release/app .
+COPY --from=builder /usr/src/app/class7-practice/templates /usr/local/bin/templates
+COPY --from=builder /usr/src/app/class7-practice/target/release/app .
 
 RUN chmod +x /usr/local/bin/app
 
