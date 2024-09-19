@@ -16,7 +16,7 @@ ENV SQLX_OFFLINE=true
 RUN cargo build --release
 
 # 第二阶段: 运行阶段
-FROM --platform=$TARGETPLATFORM debian:bullseye-slim
+FROM --platform=$TARGETPLATFORM ubuntu:22.04
 
 # 安装必要的运行时依赖
 RUN apt-get update && apt-get install -y libsqlite3-0 && rm -rf /var/lib/apt/lists/*
@@ -27,13 +27,13 @@ WORKDIR /app
 COPY --from=builder /usr/src/app/target/release/class7-practice .
 
 # 创建一个目录用于挂载SQLite数据库
-RUN mkdir /data
+# RUN mkdir /data
 
 # 设置环境变量
 ENV DATABASE_URL=/data/local.db
 
 # 暴露应用端口（根据您的应用需要调整）
-EXPOSE 8080
+EXPOSE 3000
 
 # 运行应用
 CMD ["./class7-practice"]
