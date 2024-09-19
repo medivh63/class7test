@@ -31,8 +31,9 @@ FROM --platform=$TARGETPLATFORM debian:bookworm-slim
 
 # 复制模板文件
 COPY --from=builder /usr/src/app/templates /usr/local/bin/templates
+COPY --from=builder /usr/src/app/target/release/app .
 
-#RUN chmod +x /usr/local/bin/app
+RUN chmod +x /usr/local/bin/app
 
 # 创建数据目录
 RUN mkdir /data
