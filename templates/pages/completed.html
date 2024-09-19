@@ -68,16 +68,17 @@
         }
     </style>
     <script>
-        function clearExamIdAndRestart() {
-            fetch('/restart', { method: 'GET' })
-                .then(() => {
-                    window.location.href = '/';
-                })
-                .catch(error => {
-                    console.error('重新开始时出错:', error);
-                    alert('重新开始失败，请刷新页面重试。');
-                });
-            window.location.href = '/';
+        async function clearExamIdAndRestart() {
+            try {
+                const response = await fetch('/restart', { method: 'GET' });
+                if (!response.ok) {
+                    throw new Error('重新开始请求失败');
+                }
+                window.location.href = '/';
+            } catch (error) {
+                console.error('重新开始时出错:', error);
+                alert('重新开始失败，请稍后再试。错误: ' + error.message);
+            }
         }
     </script>
 </head>
