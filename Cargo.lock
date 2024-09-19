@@ -310,7 +310,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "class7-practice"
+name = "class7exam"
 version = "0.1.0"
 dependencies = [
  "axum",
