@@ -1,51 +1,42 @@
-# 使用官方Rust镜像作为构建环境
-FROM --platform=$BUILDPLATFORM rust:1.81.0-slim-bookworm AS builder
+# 使用多阶段构建
+# 第一阶段: 构建阶段
+FROM --platform=$BUILDPLATFORM rust:1.81 as builder
 
-# 设置工作目录
 WORKDIR /usr/src/app
 
-# 复制Cargo.toml和Cargo.lock文件
-COPY Cargo.toml Cargo.lock ./
+# 复制项目文件
+COPY . .
 
-# 创建一个虚拟的main.rs文件,用于缓存依赖
-RUN mkdir src && echo "fn main() {}" > src/main.rs
+# 设置SQLX_OFFLINE为true，以确保在离线模式下构建
 
-# 构建依赖
+# 设置SQLX_OFFLINE环境变量
+ENV SQLX_OFFLINE=true
+
+# 构建项目
 RUN cargo build --release
 
-# 删除虚拟的main.rs文件
-RUN rm -f src/main.rs
+# 第二阶段: 运行阶段
+FROM --platform=$TARGETPLATFORM ubuntu:22.04
 
-# 复制实际的源代码
-COPY src ./src
-COPY templates ./templates
+# 安装必要的运行时依赖
+RUN apt-get update && apt-get install -y libsqlite3-0 && rm -rf /var/lib/apt/lists/*
 
-# 构建实际的应用
-RUN cargo build --release
-
-# 安装SSL证书和SQLite3
-RUN apt-get update && apt-get install -y ca-certificates sqlite3 libsqlite3-0 && rm -rf /var/lib/apt/lists/*
+WORKDIR /app
 
 # 从构建阶段复制编译好的二进制文件
-FROM --platform=$TARGETPLATFORM debian:bookworm-slim
+COPY --from=builder /usr/src/app/target/release/class7-practice .
+# 复制templates
+COPY --from=builder /usr/src/app/templates /app/templates
 
-# 复制模板文件
-COPY --from=builder /usr/src/app/templates /usr/local/bin/templates
-COPY --from=builder /usr/src/app/target/release/class7-practice /usr/local/bin/class7-practice
 
-# 创建数据目录
+# 创建一个目录用于挂载SQLite数据库
 RUN mkdir /data
 
-COPY local.db /var/local.db
+# 设置环境变量
+ENV DATABASE_URL=/data/local.db
 
-# 设置工作目录
-WORKDIR /usr/local/bin
-
-# 暴露3000端口
+# 暴露应用端口（根据您的应用需要调整）
 EXPOSE 3000
-
-# 设置环境变量指定数据库路径
-ENV DATABASE_URL=/var/local.db
 
 # 运行应用
 CMD ["./class7-practice"]
