@@ -26,7 +26,7 @@ jobs:
         file: ./Dockerfile
         platforms: linux/amd64,linux/arm64,linux/arm/v7
         push: true
-        tags: ${{ secrets.DOCKERHUB_USERNAME }}/your-image-name:latest
+        tags: ${{ secrets.DOCKERHUB_USERNAME }}/class7-practice:latest
 
     - name: 部署到远程服务器
       uses: appleboy/ssh-action@master
@@ -35,7 +35,7 @@ jobs:
         username: ${{ secrets.SERVER_USERNAME }}
         key: ${{ secrets.SERVER_SSH_KEY }}
         script: |
-          docker pull ${{ secrets.DOCKERHUB_USERNAME }}/your-image-name:latest
-          docker stop your-container-name || true
-          docker rm your-container-name || true
-          docker run -d --name your-container-name -p 3000:3000 ${{ secrets.DOCKERHUB_USERNAME }}/your-image-name:latest
+          docker pull ${{ secrets.DOCKERHUB_USERNAME }}/class7-practice:latest
+          docker stop app || true
+          docker rm app || true
+          docker run -d --name app -p 3000:3000 ${{ secrets.DOCKERHUB_USERNAME }}/class7-practice:latest
