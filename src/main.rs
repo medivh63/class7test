@@ -1,6 +1,7 @@
 use axum::{
     extract::{Path, State},
     http::header,
+    middleware::map_request,
     response::{AppendHeaders, Html, IntoResponse, Redirect},
     routing::{get, post},
     Error, Json, Router,
@@ -62,6 +63,7 @@ async fn main() {
         .route("/class7/restart", get(restart))
         .fallback(fallback)
         .layer(CookieManagerLayer::new()) // 添加此行以启用 Cookie 管理
+        .layer(map_request(log_request))
         .with_state(state);
 
     // run our app with hyper, listening globally on port 3000
@@ -97,6 +99,24 @@ struct Answer {
     exam_id: String,
     question_id: String,
     is_correct: bool,
+}
+
+// 添加新的日志中间件函数
+async fn log_request<B>(request: axum::http::Request<B>) -> axum::http::Request<B> {
+    let path = request.uri().path();
+    // 定义需要记录的路径
+    let logged_paths = vec![
+        "/class7",
+        "/class7/exam/",
+        "/class7/submit_answer",
+        "/class7/restart",
+    ];
+    let now = chrono::Local::now();
+    // 检查当前路径是否需要记录
+    if logged_paths.iter().any(|&p| path.starts_with(p)) {
+        tracing::info!("------->request path: {}, time: {}", path, now);
+    }
+    request
 }
 
 /// 重新开始
@@ -136,7 +156,7 @@ async fn submit_answer(
     let record = ExamRecord {
         exam_id: Some(answer.exam_id),
         question_id: Some(answer.question_id),
-        created_at: Some(chrono::Utc::now().to_string()),
+        created_at: Some(chrono::Local::now().to_string()),
         is_correct: Some(answer.is_correct as i64),
     };
     sqlx::query!(
