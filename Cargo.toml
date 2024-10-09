@@ -6,20 +6,20 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-tokio = { version = "1.40.0", features = ["full"] }
-serde = { version = "1.0.209", features = ["derive"] }
-serde_json = "1.0.127"
-dotenv = "0.15.0"
-uuid = { version = "1.10.0", features = ["serde", "v4"] }
+tokio = { version = "1", features = ["full"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+dotenv = "0.15"
+uuid = { version = "1.10", features = ["serde", "v4"] }
 chrono = { version = "0.4", features = ["serde"] }
 axum = {version = "0.7",features = ["json"] }
-sqlx = { version = "0.8.1", features = ["sqlite", "macros", "runtime-tokio"] }
-tera = { version = "1"}
+sqlx = { version = "0.8", features = ["sqlite", "macros", "runtime-tokio"] }
+tera = { version = "1.20"}
 lazy_static = {version = "1"}
 captcha = "0.0.9"
 tower-cookies = "0.10"
+tower-http = {version = "0.6", features = ["trace"]}
 rand = "0.8.5"
 config = "0.14.0"
-tracing = "0.1.40"
+tracing = "0.1"
 tracing-subscriber = "0.3"
-tracing-appender = "0.2"

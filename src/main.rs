@@ -1,7 +1,6 @@
 use axum::{
     extract::{Path, State},
     http::header,
-    middleware::map_request,
     response::{AppendHeaders, Html, IntoResponse, Redirect},
     routing::{get, post},
     Error, Json, Router,
@@ -12,6 +11,7 @@ use serde::{Deserialize, Serialize};
 use sqlx::{pool::PoolOptions, SqlitePool};
 use tera::{Context, Tera};
 use tower_cookies::{Cookie, CookieManagerLayer, Cookies};
+use tower_http::trace::TraceLayer;
 use uuid::Uuid;
 
 lazy_static! {
@@ -36,14 +36,11 @@ struct AppState {
 #[tokio::main]
 async fn main() {
     dotenv::dotenv().ok();
-    let file_appender = tracing_appender::rolling::daily("logs", "app.log");
-    let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
-    tracing_subscriber::fmt()
-        .pretty()
-        .with_thread_names(true)
-        .with_max_level(tracing::Level::DEBUG)
-        .with_writer(non_blocking) // 将日志输出到文件
-        .init();
+     // 初始化 tracing
+     tracing_subscriber::fmt()
+     .with_max_level(tracing::Level::TRACE)
+     .with_file(true)
+     .init();
 
     // 数据库连接池
     let database = init_db().await.unwrap();
@@ -57,19 +54,25 @@ async fn main() {
 
     // build our application with a route
     let app = Router::new()
-        .route("/class7", get(index))
-        .route("/class7/practice/:practice_id", get(get_practice_test))
-        .route("/class7/submit_answer", post(submit_answer))
-        .route("/class7/restart", get(restart))
+        .nest("/class7/practice", practice_routes())
         .fallback(fallback)
         .layer(CookieManagerLayer::new()) // 添加此行以启用 Cookie 管理
-        .layer(map_request(log_request))
+        .layer(TraceLayer::new_for_http())
         .with_state(state);
 
     // run our app with hyper, listening globally on port 3000
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
     tracing::info!("Server running on: {}", listener.local_addr().unwrap());
     axum::serve(listener, app).await.unwrap()
+}
+
+/// class7 practice 路由
+fn practice_routes() -> Router<AppState> {
+    Router::new()
+        .route("/", get(index))
+        .route("/:practice_id", get(get_practice))
+        .route("/:practice_id/answers", post(answers))
+        .route("/:practice_id/restart", get(restart))
 }
 
 #[derive(sqlx::FromRow, Debug, Deserialize, Serialize)]
@@ -101,24 +104,6 @@ struct Answer {
     is_correct: bool,
 }
 
-// 添加新的日志中间件函数
-async fn log_request<B>(request: axum::http::Request<B>) -> axum::http::Request<B> {
-    let path = request.uri().path();
-    // 定义需要记录的路径
-    let logged_paths = [
-        "/class7",
-        "/class7/practice/",
-        "/class7/submit_answer",
-        "/class7/restart",
-    ];
-    let now = chrono::Local::now();
-    // 检查当前路径是否需要记录
-    if logged_paths.iter().any(|&p| path.starts_with(p)) {
-        tracing::info!("------->request path: {}, time: {}", path, now);
-    }
-    request
-}
-
 /// 重新开始
 async fn restart(cookies: Cookies) -> Redirect {
     tracing::info!(
@@ -126,7 +111,7 @@ async fn restart(cookies: Cookies) -> Redirect {
         cookies.get("practice_id").unwrap().value()
     );
     cookies.remove(Cookie::new("practice_id", ""));
-    Redirect::to("/class7")
+    Redirect::to("/class7/practice")
 }
 
 /// 404页面
@@ -151,10 +136,7 @@ async fn get_all_question_ids(pool: &SqlitePool) -> Vec<String> {
 }
 
 /// 提交问题
-async fn submit_answer(
-    State(state): State<AppState>,
-    Json(answer): Json<Answer>,
-) -> impl IntoResponse {
+async fn answers(State(state): State<AppState>, Json(answer): Json<Answer>) -> impl IntoResponse {
     // 处理答题记录
     let record = PracticeRecord {
         practice_id: answer.practice_id,
@@ -194,7 +176,7 @@ async fn index(cookies: Cookies) -> impl IntoResponse {
     let headers = AppendHeaders([(header::SET_COOKIE, cookie)]);
     let mut context = Context::new();
     context.insert(
-        "start_practice_url",
+        "get_practice_url",
         &format!("/class7/practice/{}", practice_id),
     );
     let html = TEMPLATES.render("class7/index.html", &context);
@@ -204,8 +186,8 @@ async fn index(cookies: Cookies) -> impl IntoResponse {
     }
 }
 
-/// 开始练习
-async fn get_practice_test(
+/// 获取练习
+async fn get_practice(
     Path(practice_id): Path<String>,
     State(state): State<AppState>,
 ) -> Html<String> {

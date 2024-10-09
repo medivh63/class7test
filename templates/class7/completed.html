@@ -79,13 +79,15 @@
         }
     </style>
     <script>
+        const practice = '{{ practice_id }}';
+
         async function clearExamIdAndRestart() {
             try {
-                const response = await fetch('/class7/restart', { method: 'GET' });
+                const response = await fetch('/class7/${practice}/restart', { method: 'GET' });
                 if (!response.ok) {
                     throw new Error('重新开始请求失败');
                 }
-                window.location.href = '/class7';
+                window.location.href = '/class7/practice';
             } catch (error) {
                 console.error('重新开始时出错:', error);
                 alert('重新开始失败，请稍后再试。错误: ' + error.message);

@@ -33,7 +33,7 @@
 
         .option-box:first-child {
             border-top: none;
-            /* 移除第一个选项的上边框 */
+            /* 移除第一个选项的上边 */
         }
 
         .option-box::before {
@@ -167,6 +167,8 @@
     </div>
 
     <script>
+        const practiceId = "{{ practice_id }}";
+        const questionId = "{{ question_id }}";
         let answerSelected = false;
         const nextButton = document.getElementById('nextButton');
 
@@ -179,28 +181,27 @@
 
             // 保存答题记录
             try {
-                const response = await fetch('/class7/submit_answer', {
+                const response = await fetch(`/class7/${practiceId}/answers`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
+                        'X-CSRFToken': getCookie('csrftoken')
                     },
                     body: JSON.stringify({
-                        question_id: '{{ question_id }}',  // 假设后端提供了问题ID
-                        practice_id: '{{ practice_id }}',  // 假设后端提供了考试ID
-                        // selectedOption: selectedOption,
+                        question_id: questionId,
+                        selected_option: selectedOption,
                         is_correct: isCorrect
                     }),
                 });
 
                 if (!response.ok) {
-                    throw new Error('Failed to save answer record');
+                    throw new Error('保存答题记录失败');
                 }
             } catch (error) {
-                console.error('Error while saving answer record:', error);
-                // 这里可以添加一些错误处理逻辑，比如显示一个错误消息给用户
+                console.error('保存答题记录时出错:', error);
             }
 
-            // 显示正确答案和用户选择
+            // 显示正确答案用户选择
             document.querySelectorAll('.option-box').forEach(box => {
                 box.classList.add('disabled');
                 if (box.dataset.correct === 'true') {
@@ -221,6 +222,22 @@
         function nextQuestion() {
             // 刷新当前页面
             window.location.reload();
+        }
+
+        // 获取 CSRF token 的辅助函数
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
         }
     </script>
 </body>
