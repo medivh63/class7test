@@ -33,11 +33,10 @@ jobs:
       with:
         host: ${{ secrets.SERVER_HOST }}
         username: ${{ secrets.SERVER_USERNAME }}
-        # key: ${{ secrets.SERVER_SSH_KEY }}
         password: ${{ secrets.SERVER_PASSWORD }}
         script: |
           echo "Connected to server"
-          docker pull ${{ secrets.DOCKERHUB_USERNAME }}/class7exam:latest
+          docker pull ${{ secrets.DOCKERHUB_USERNAME }}/class7test:latest
           docker stop app || true
           docker rm app || true
           docker run -d --name app -p 3000:3000 -v /usr/local/local.db:/data/local.db  ${{ secrets.DOCKERHUB_USERNAME }}/class7exam:latest
