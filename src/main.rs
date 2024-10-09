@@ -16,7 +16,7 @@ use uuid::Uuid;
 
 lazy_static! {
     pub static ref TEMPLATES: Tera = {
-        let mut tera = match Tera::new("static/pages/*.html") {
+        let mut tera = match Tera::new("templates/**/*.html") {
             Ok(t) => t,
             Err(e) => {
                 tracing::error!("Parsing error(s): {}", e);
@@ -58,7 +58,7 @@ async fn main() {
     // build our application with a route
     let app = Router::new()
         .route("/class7", get(index))
-        .route("/class7/practice/:practice_id", get(start_practice_test))
+        .route("/class7/practice/:practice_id", get(get_practice_test))
         .route("/class7/submit_answer", post(submit_answer))
         .route("/class7/restart", get(restart))
         .fallback(fallback)
@@ -74,18 +74,18 @@ async fn main() {
 
 #[derive(sqlx::FromRow, Debug, Deserialize, Serialize)]
 struct Question {
-    id: Option<String>,
+    id: String,
     content: Option<String>,
     images: Option<String>,
-    options: Option<String>,
+    options: String,
 }
 
 #[derive(sqlx::FromRow, Debug, Deserialize, Serialize)]
 struct PracticeRecord {
-    practice_id: Option<String>,
-    question_id: Option<String>,
-    is_correct: Option<i64>,
-    created_at: Option<String>,
+    practice_id: String,
+    question_id: String,
+    is_correct: i64,
+    created_at: String,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -145,7 +145,7 @@ async fn get_all_question_ids(pool: &SqlitePool) -> Vec<String> {
         .await
         .unwrap()
         .into_iter()
-        .map(|record| record.id.unwrap())
+        .map(|record| record.id)
         .collect();
     questions
 }
@@ -157,10 +157,10 @@ async fn submit_answer(
 ) -> impl IntoResponse {
     // 处理答题记录
     let record = PracticeRecord {
-        practice_id: Some(answer.practice_id),
-        question_id: Some(answer.question_id),
-        created_at: Some(chrono::Local::now().to_string()),
-        is_correct: Some(answer.is_correct as i64),
+        practice_id: answer.practice_id,
+        question_id: answer.question_id,
+        created_at: chrono::Local::now().to_string(),
+        is_correct: answer.is_correct as i64,
     };
     sqlx::query!(
         "INSERT INTO practice_record (practice_id, question_id, is_correct, created_at) VALUES ($1, $2, $3, $4)",
@@ -193,8 +193,11 @@ async fn index(cookies: Cookies) -> impl IntoResponse {
     );
     let headers = AppendHeaders([(header::SET_COOKIE, cookie)]);
     let mut context = Context::new();
-    context.insert("start_practice_url", &format!("/class7/practice/{}", practice_id));
-    let html = TEMPLATES.render("index.html", &context);
+    context.insert(
+        "start_practice_url",
+        &format!("/class7/practice/{}", practice_id),
+    );
+    let html = TEMPLATES.render("class7/index.html", &context);
     match html {
         Ok(t) => (headers, Html(t)),
         Err(e) => (headers, Html(format!("错误: {}", e))),
@@ -202,17 +205,18 @@ async fn index(cookies: Cookies) -> impl IntoResponse {
 }
 
 /// 开始练习
-async fn start_practice_test(
+async fn get_practice_test(
     Path(practice_id): Path<String>,
     State(state): State<AppState>,
 ) -> Html<String> {
     // 查询 exam_record , 这个sql返回的是一个集合
-    let exam_question_ids: Vec<String> =
-        sqlx::query_scalar("SELECT DISTINCT question_id FROM practice_record WHERE practice_id = ?")
-            .bind(&practice_id)
-            .fetch_all(&state.pool)
-            .await
-            .unwrap();
+    let exam_question_ids: Vec<String> = sqlx::query_scalar(
+        "SELECT DISTINCT question_id FROM practice_record WHERE practice_id = ?",
+    )
+    .bind(&practice_id)
+    .fetch_all(&state.pool)
+    .await
+    .unwrap();
     // 从state.questions和exam_question_ids取差集
     let question_ids = state
         .questions
@@ -238,7 +242,7 @@ async fn start_practice_test(
                 (exam_question_ids.len() as f64 / state.questions.len() as f64) * 100.0
             ),
         );
-        let html = TEMPLATES.render("completed.html", &context);
+        let html = TEMPLATES.render("class7/completed.html", &context);
         match html {
             Ok(t) => return Html(t),
             Err(e) => {
@@ -256,7 +260,7 @@ async fn start_practice_test(
         .await
         .unwrap();
     let question_images = vec![question.images];
-    let options: Vec<QuestionOption> = serde_json::from_str(&question.options.unwrap()).unwrap();
+    let options: Vec<QuestionOption> = serde_json::from_str(&question.options).unwrap();
     let mut context = Context::new();
     context.insert("practice_id", &practice_id);
     context.insert("question_id", &question_id);
@@ -265,7 +269,7 @@ async fn start_practice_test(
     context.insert("current_question_number", &question_ids.len());
     context.insert("total_questions", &state.questions.len());
     context.insert("options", &options);
-    let html = TEMPLATES.render("practice.html", &context);
+    let html = TEMPLATES.render("class7/practice.html", &context);
     match html {
         Ok(t) => Html(t),
         Err(e) => {
