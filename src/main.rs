@@ -43,7 +43,7 @@ async fn main() {
      .init();
 
     // 数据库连接池
-    let database = init_db().await.unwrap();
+    let database = database().await.unwrap();
 
     let questions = get_all_question_ids(&database).await;
     tracing::info!("there have {} questions ", questions.len());
@@ -136,10 +136,10 @@ async fn get_all_question_ids(pool: &SqlitePool) -> Vec<String> {
 }
 
 /// 提交问题
-async fn answers(State(state): State<AppState>, Json(answer): Json<Answer>) -> impl IntoResponse {
+async fn answers(Path(practice_id): Path<String>,State(state): State<AppState>, Json(answer): Json<Answer>) -> impl IntoResponse {
     // 处理答题记录
     let record = PracticeRecord {
-        practice_id: answer.practice_id,
+        practice_id,
         question_id: answer.question_id,
         created_at: chrono::Local::now().to_string(),
         is_correct: answer.is_correct as i64,
@@ -262,7 +262,7 @@ async fn get_practice(
 }
 
 /// 初始化数据库
-async fn init_db() -> Result<SqlitePool, Error> {
+async fn database() -> Result<SqlitePool, Error> {
     let database_url = dotenv::var("DATABASE_URL").expect("DATABASE_URL must be set");
     let pool = PoolOptions::new()
         .max_connections(5)
